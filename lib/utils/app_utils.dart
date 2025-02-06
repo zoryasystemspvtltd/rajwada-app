@@ -7,7 +7,4 @@ class AppUtils {
     String actualDate = formatterDate.format(date);
     return actualDate;
   }
-
-  static const Color backGroundColor= Colors.black /*Color(0XFF1E212D)*/;
-  static const Color backGroundColorAppbar=  Color(0xFFEABF9F);
 }
