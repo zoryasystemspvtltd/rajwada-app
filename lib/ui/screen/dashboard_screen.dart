@@ -1,8 +1,14 @@
-import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
-import 'package:image_picker/image_picker.dart';
+import 'package:rajwada_app/core/functions/auth_function.dart';
+import 'package:rajwada_app/core/model/login_data_model.dart';
+import 'package:rajwada_app/ui/helper/app_colors.dart';
+import 'package:rajwada_app/ui/helper/assets_path.dart';
+import '../../core/functions/functions.dart';
+import '../widget/custom_date_field.dart';
+import '../widget/custom_text_field.dart';
+import '../widget/form_field_widget.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -14,460 +20,580 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
 
-  // final TextEditingController _startDateController = TextEditingController();
-  // final TextEditingController _endDateController = TextEditingController();
-  //
-  // bool _isChecked = false;
-  //
-  // Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
-  //   DateTime now = DateTime.now();
-  //   DateTime? selectedDate = await showDatePicker(
-  //     context: context,
-  //     initialDate: now,
-  //     firstDate: now,
-  //     lastDate: DateTime(2100),
-  //   );
-  //   if (selectedDate != null) {
-  //     setState(() {
-  //       controller.text = "${selectedDate.toLocal()}".split(' ')[0];
-  //     });
-  //   }
-  // }
+  final List<Map<String, dynamic>> menuItems = [
+    {"title": "Home", "icon": Icons.home},
+    {"title": "Profile", "icon": Icons.person},
+    {"title": "Settings", "icon": Icons.settings},
+    {"title": "Activity Reporting", "icon": Icons.pie_chart},
+    {"title": "Logout", "icon": Icons.logout},
+  ];
 
-  final List<Map<String, dynamic>> _icons = [];
-  XFile? _capturedImage;
-  final ImagePicker _picker = ImagePicker();
+  final AuthService authService = AuthService(); // Initialize AuthService
+  final RestFunction restService = RestFunction();
 
-  Future<void> _openCamera() async {
-    // Open the device camera
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
-    if (image != null) {
-      setState(() {
-        _capturedImage = image;
-      });
+  final LoginDataModel loginModel = LoginDataModel();
+
+  final TextEditingController trackingNoController = TextEditingController();
+  final TextEditingController vehicleNoController = TextEditingController();
+  final TextEditingController documentDateController = TextEditingController();
+  final TextEditingController quantityDataController = TextEditingController();
+  final TextEditingController priceDataController = TextEditingController();
+  final TextEditingController receiverRemarkDataController = TextEditingController();
+
+
+  String selectedQuality = "--Select--";
+  String selectedProject = "--Select--";
+  String selectedQualityInCharge = "--Select--";
+
+  List<DropdownMenuItem<int>> userProjectItems = [];
+  List<DropdownMenuItem<int>> quantityInChargeItems = [];
+  List<DropdownMenuItem<int>> supplierDataItems = [];
+
+  List<DropdownMenuItem<int>> assetsDataItems = [];
+  List<DropdownMenuItem<int>> uomDataItems = [];
+  List<DropdownMenuItem<int>> qualityStatusItems = [];
+
+  int? selectedProjectId;
+  int? selectedQuantityInChargeId; // Default selected ID
+  int? selectedSupplierId;
+
+  int selectedAssetId = -1;
+  int selectedUomId = -1;
+  int selectedQualityStatusId = -1; // Default selected ID
+
+  bool showListView = false; // Initially hidden
+  Map<int, Map<String, TextEditingController>> controllers = {};
+
+  List<Map<String, dynamic>> dataRows = [
+    {
+      "item": null,  // Dropdown value (int or String)
+      "quantity": "",
+      "price": "",
+      "uom": null,  // Dropdown value (int or String)
+      "qualityStatus": null,  // Dropdown value
+      "receiverRemarks": ""
     }
+  ];
+
+ //Fetch Pre Data Sets
+  void getUserData() async {
+    List<DropdownMenuItem<int>> items = await RestFunction.fetchQualityUsersDropdown();
+    setState(() {
+      quantityInChargeItems = items;
+    });
   }
 
-  void _showIconOptionsDialog(Offset position) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Select Icon'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(Icons.camera_alt),
-                title: Text('Camera Icon'),
-                onTap: () {
-                  setState(() {
-                    _icons.add({'position': position, 'type': 'camera', 'text': ''});
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.bubble_chart),
-                title: Text('Balloon Icon'),
-                onTap: () {
-                  setState(() {
-                    _icons.add({'position': position, 'type': 'balloon', 'text': ''});
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  void getUserProjects() async {
+    List<DropdownMenuItem<int>> items = await RestFunction.fetchAndStoreUserProjectData();
+      setState(() {
+        userProjectItems = items;
+      });
   }
 
-  void _showAddTextDialog(Map<String, dynamic> iconData) {
-    TextEditingController _textController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Add Text'),
-          content: TextField(
-            controller: _textController,
-            decoration: InputDecoration(hintText: 'Enter your text here'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  iconData['text'] = _textController.text;
-                });
-                Navigator.pop(context);
-              },
-              child: Text('Add'),
-            ),
-          ],
-        );
-      },
-    );
+  void getSupplier() async {
+    List<DropdownMenuItem<int>> items = await RestFunction.fetchAndStoreSupplierData();
+      setState(() {
+        supplierDataItems = items;
+      });
   }
 
-  void _showFullScreenImage(File imageFile) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => FullScreenImage(imageFile: imageFile),
-      ),
-    );
+  void getAssets() async {
+    List<DropdownMenuItem<int>> items = await RestFunction.fetchAndStoreAssetData();
+      setState(() {
+        assetsDataItems = items;
+      });
   }
 
-  void _showCameraIconDialog(Map<String, dynamic> iconData) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Camera Icon'),
-          content: const Text('Do you want to place a new camera icon or remove the existing one?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // Remove the camera icon
-                setState(() {
-                  _icons.remove(iconData);
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('Remove'),
-            ),
-            TextButton(
-              onPressed: () {
-                // Place a new camera icon
-                _openCamera();
-                Navigator.pop(context);
-              },
-              child: const Text('Update Existing Picture'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
+  void getUomData() async {
+    List<DropdownMenuItem<int>> items = await RestFunction.fetchAndStoreUOMData();
+      setState(() {
+        uomDataItems = items;
+      });
   }
 
-  void _showBalloonIconDialog(Map<String, dynamic> iconData) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Balloon Icon'),
-          content: const Text('Do you want to place a new balloon icon or remove the existing one?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // Remove the balloon icon
-                setState(() {
-                  _icons.remove(iconData);
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('Remove'),
-            ),
-            TextButton(
-              onPressed: () {
-                // Place a new balloon icon by calling _showAddTextDialog
-                setState(() {
-                  Navigator.pop(context);
-                  _showAddTextDialog(iconData);
-                });
+  void getQualityStatus() async {
+    List<DropdownMenuItem<int>> items = await restService.fetchAndStoreQualityStatusData();
+    setState(() {
+      qualityStatusItems = items;
+    });
+  }
 
-                //Navigator.pop(context);
-              },
-              child: const Text('Update Existing Text'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
+  @override
+  void initState() {
+    super.initState();
+    getUserData();
+    getUserProjects();
+    getSupplier();
+    getAssets();
+    getUomData();
+    getQualityStatus();
+
+  }
+
+  TextEditingController getController(int index, String fieldKey) {
+    if (!controllers.containsKey(index)) {
+      controllers[index] = {};
+    }
+    return controllers[index]!.putIfAbsent(fieldKey, () => TextEditingController());
+  }
+
+  void addRow() {
+    setState(() {
+      int newIndex = dataRows.length; // Get new row index
+
+      dataRows.add({
+        "item": null,
+        "quantity": "",
+        "price": "",
+        "uom": null,
+        "qualityStatus": null,
+        "receiverRemarks": ""
+      });
+
+      // Initialize controllers for the new row
+      controllers[newIndex] = {
+        "quantity": TextEditingController(),
+        "price": TextEditingController(),
+        "email": TextEditingController(),
+        "phone": TextEditingController(),
+      };
+    });
+  }
+
+  void removeRow(int index) {
+    setState(() {
+      // Remove the corresponding row
+      dataRows.removeAt(index);
+
+      // Rebuild the controllers map after shifting indices
+      Map<int, Map<String, TextEditingController>> updatedControllers = {};
+
+      for (int i = 0; i < dataRows.length; i++) {
+        updatedControllers[i] = controllers[i + 1] ?? {};
+      }
+
+      controllers = updatedControllers;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
     return Scaffold(
-      body: Stack(
-        children: [
-          // Floor plan image
-          GestureDetector(
-            onTapDown: (TapDownDetails details) {
-              _showIconOptionsDialog(details.localPosition);
-            },
-            child: Image.asset(
-              'assets/images/f1.jpeg', // Add the image to your assets folder
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
+      appBar: AppBar(
+        title: Container(
+          width: 120,
+          height: 45,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            image: DecorationImage(
+              image: AssetImage(AssetsPath.drawerLogo),
+              fit: BoxFit.fill,
             ),
           ),
-          // Display added icons
-          ..._icons.map((iconData) {
-            Offset position = iconData['position'];
-            String type = iconData['type'];
-            String text = iconData['text'];
-
-            return Positioned(
-              left: position.dx - 25, // Adjust offset
-              top: position.dy - 25,
-              child: GestureDetector(
-                onTap: () {
-                  if (type == 'camera') {
-                    if (_capturedImage != null){
-                      _showCameraIconDialog(iconData);
-                    } else{
-                      _openCamera();
-                    }
-
-                  } else if (type == 'balloon') {
-                    if (text.isEmpty){
-                      _showAddTextDialog(iconData);
-                    } else{
-                      _showBalloonIconDialog(iconData);
-                    }
-
-                  }
-                },
+        ),
+        backgroundColor: AppColor.colorPrimary,
+        iconTheme: IconThemeData(color: Colors.white),
+      ),
+      drawer: Drawer(
+        child: Container(
+          color: AppColor.colorPrimary, // Background color
+          child: Column(
+            children: [
+              DrawerHeader(
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset(
-                      type == 'camera'
-                          ? 'assets/images/c1.png'
-                          : 'assets/images/pin.png', // Add balloon icon
-                      width: 50,
-                      height: 50,
-                    ),
-                    if (text.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(5),
-                        color: Colors.white,
-                        child: Text(
-                          text,
-                          style: const TextStyle(fontSize: 12, color: Colors.black),
+                    ColorFiltered(
+                      colorFilter: const ColorFilter.mode(
+                        Colors.white, // Change image color to white
+                        BlendMode
+                            .srcATop, // Blend mode to apply color over image
+                      ),
+                      child: Container(
+                        width: 220,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          image: const DecorationImage(
+                            image: AssetImage(AssetsPath.currentAppLogo),
+                            fit: BoxFit.fill,
+                          ),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 10),
                   ],
                 ),
               ),
-            );
-          }),
-          // Display captured image
-          if (_capturedImage != null)
-            Positioned(
-              bottom: 20,
-              left: 20,
-              child: GestureDetector(
-                onTap: () {
-                  _showFullScreenImage(File(_capturedImage!.path));
-                },
-                child: Image.file(
-                  File(_capturedImage!.path),
-                  width: 100,
-                  height: 100,
+              Expanded(
+                child: ListView.builder(
+                  itemCount: menuItems.length,
+                  itemBuilder: (context, index) {
+                    return ListTile(
+                      leading: Icon(
+                          menuItems[index]['icon'], color: Colors.white),
+                      title: Text(
+                        menuItems[index]['title'],
+                        style: const TextStyle(color: Colors.white,
+                            fontSize: 16),
+                      ),
+                      onTap: () {
+                        // Handle navigation
+                        Navigator.pop(context);
+                        if (menuItems[index]["title"] == "Logout") {
+                          authService.logout();
+                          Navigator.pushReplacementNamed(context, '/login');
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(
+                                'Navigating to ${menuItems[index]["title"]}')),
+                          );
+                        }
+                      },
+                    );
+                  },
                 ),
               ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
-      // Container(
-      //   padding: EdgeInsets.only(top: 50),
-      //   width: double.infinity,
-      //   height: double.infinity,
-      //   decoration: const BoxDecoration(
-      //     image: DecorationImage(
-      //       image: AssetImage('assets/images/onboard_background.png'),
-      //       fit: BoxFit.cover,
-      //     ),
-      //   ),
-      //   child: Padding(
-      //     padding: const EdgeInsets.all(16.0),
-      //     child: SingleChildScrollView(
-      //       child: Column(
-      //         crossAxisAlignment: CrossAxisAlignment.start,
-      //         children: [
-      //           // Name TextField
-      //           TextField(
-      //             decoration: InputDecoration(
-      //               labelText: 'Name',
-      //               hintText: 'Enter your name',
-      //               border: OutlineInputBorder(
-      //                 borderRadius: BorderRadius.circular(8),
-      //               ),
-      //             ),
-      //           ),
-      //           SizedBox(height: 20),
-      //
-      //           // Email TextField
-      //           TextField(
-      //             decoration: InputDecoration(
-      //               labelText: 'Email',
-      //               hintText: 'Enter your email',
-      //               border: OutlineInputBorder(
-      //                 borderRadius: BorderRadius.circular(8),
-      //               ),
-      //             ),
-      //           ),
-      //           SizedBox(height: 20),
-      //
-      //           // Phone Number TextField
-      //           TextField(
-      //             keyboardType: TextInputType.phone,
-      //             decoration: InputDecoration(
-      //               labelText: 'Phone Number',
-      //               hintText: 'Enter your phone number',
-      //               border: OutlineInputBorder(
-      //                 borderRadius: BorderRadius.circular(8),
-      //               ),
-      //             ),
-      //           ),
-      //           SizedBox(height: 20),
-      //
-      //           // Address TextField
-      //           TextField(
-      //             maxLines: 3,
-      //             decoration: InputDecoration(
-      //               labelText: 'Address',
-      //               hintText: 'Enter your address',
-      //               border: OutlineInputBorder(
-      //                 borderRadius: BorderRadius.circular(8),
-      //               ),
-      //             ),
-      //           ),
-      //           SizedBox(height: 20),
-      //
-      //           // Start Date and End Date
-      //           Row(
-      //             children: [
-      //               Expanded(
-      //                 child: GestureDetector(
-      //                   onTap: () => _selectDate(context, _startDateController),
-      //                   child: AbsorbPointer(
-      //                     child: TextField(
-      //                       controller: _startDateController,
-      //                       decoration: InputDecoration(
-      //                         labelText: 'Start Date',
-      //                         hintText: 'Select start date',
-      //                         border: OutlineInputBorder(
-      //                           borderRadius: BorderRadius.circular(8),
-      //                         ),
-      //                       ),
-      //                     ),
-      //                   ),
-      //                 ),
-      //               ),
-      //               SizedBox(width: 10),
-      //               Expanded(
-      //                 child: GestureDetector(
-      //                   onTap: () => _selectDate(context, _endDateController),
-      //                   child: AbsorbPointer(
-      //                     child: TextField(
-      //                       controller: _endDateController,
-      //                       decoration: InputDecoration(
-      //                         labelText: 'End Date',
-      //                         hintText: 'Select end date',
-      //                         border: OutlineInputBorder(
-      //                           borderRadius: BorderRadius.circular(8),
-      //                         ),
-      //                       ),
-      //                     ),
-      //                   ),
-      //                 ),
-      //               ),
-      //             ],
-      //           ),
-      //           SizedBox(height: 20),
-      //
-      //           // Checkbox
-      //           Row(
-      //             children: [
-      //               Checkbox(
-      //                 value: _isChecked,
-      //                 onChanged: (value) {
-      //                   setState(() {
-      //                     _isChecked = value!;
-      //                   });
-      //                 },
-      //               ),
-      //               Text('I agree to the terms and conditions'),
-      //             ],
-      //           ),
-      //
-      //           SizedBox(height: 20),
-      //
-      //           // Submit Button
-      //           SizedBox(
-      //             width: double.infinity,
-      //             child: ElevatedButton(
-      //               onPressed: () {
-      //                 // Login action
-      //                 //Navigator.pushReplacementNamed(context, '/dashboard');
-      //               },
-      //               style: ElevatedButton.styleFrom(
-      //                 backgroundColor: Colors.green,
-      //                 padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 100),
-      //                 shape: RoundedRectangleBorder(
-      //                   borderRadius: BorderRadius.circular(10),
-      //                 ),
-      //               ),
-      //               child: const Text(
-      //                 "Submit",
-      //                 style:
-      //                 TextStyle(fontSize: 18, color: Colors.white),
-      //               ),
-      //             ),
-      //           ),
-      //         ],
-      //       ),
-      //     ),
-      //   ),
-      // ),
-    );
-  }
-}
+      body: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 20,),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      decoration: InputDecoration(
+                        labelText: "Project *",
+                        border: OutlineInputBorder( // Default border
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                        enabledBorder: OutlineInputBorder( // Unfocused border
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder( // Focused border
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black), // Smaller text size
+                      value: selectedProjectId,
+                      items: userProjectItems,
+                      onChanged: (value) {
+                        setState(() {
+                          selectedProjectId = value!;
+                        });
+                        if (kDebugMode) {
+                          print("Selected Project Status ID: $selectedProjectId");
+                        }
+                      },
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      decoration: InputDecoration(
+                        labelText: "Quality In Charge *",
+                        border: OutlineInputBorder( // Default border
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                        enabledBorder: OutlineInputBorder( // Unfocused border
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder( // Focused border
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black), // Smaller text size
+                      value: selectedQuantityInChargeId,
+                      items: quantityInChargeItems,
+                      onChanged: (value) {
+                        setState(() {
+                          selectedQuantityInChargeId = value!;
+                        });
+                        if (kDebugMode) {
+                          print("Selected Quality Status ID: $selectedQuantityInChargeId");
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: CustomTextField(
+                    label: "Tracking No",
+                    controller: trackingNoController,
+                    hintText: "Tracking No Here...",
+                  )),
+                  SizedBox(width: 10),
+                  Expanded(child:  CustomDateField(
+                    label: "Document Date *",
+                    controller: documentDateController,
+                  )),
+                ],
+              ),
+              SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                      child: CustomTextField(
+                    label: "Vehicle No",
+                    controller: vehicleNoController,
+                    hintText: "Vehicle No Here...",
+                  )),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      decoration: InputDecoration(
+                          labelText: "Supplier Name *",
+                        border: OutlineInputBorder( // Default border
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                        enabledBorder: OutlineInputBorder( // Unfocused border
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder( // Focused border
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                      ),
+                      value: selectedSupplierId,
+                      items: supplierDataItems,
+                      onChanged: (value) {
+                        setState(() {
+                          selectedSupplierId = value!;
+                        });
+                        if (kDebugMode) {
+                          print("Selected Quality In Charge Status ID: $selectedSupplierId");
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    onPressed: () {
+                      setState(() {
+                        showListView = true; // Show ListView when Save is clicked
+                      });
+                    },
+                    child: Text("Save", style: TextStyle(color: Colors.white)),
+                  ),
+                  SizedBox(width: 10),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
+                    onPressed: () {},
+                    child: Text("Cancel", style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+              SizedBox(height: 40),
+              if (showListView) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Text("Item List",style: TextStyle(fontSize: 18,fontWeight: FontWeight.bold),),
+                    SizedBox(width: 20,),
+                    IconButton(
+                      icon: Icon(Icons.add_circle_rounded, color: Colors.blue,size: 30,),
+                      onPressed: () => {
+                          addRow()
+                      },
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20),
+                ListView.builder(
+                  shrinkWrap: true, // Helps avoid infinite height issues
+                  physics: NeverScrollableScrollPhysics(),
+                  itemCount: dataRows.length,
+                  itemBuilder: (context, index) {
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                decoration: InputDecoration(
+                                  labelText: "Item *",
+                                  border: OutlineInputBorder( // Default border
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                                  ),
+                                  enabledBorder: OutlineInputBorder( // Unfocused border
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                                  ),
+                                  focusedBorder: OutlineInputBorder( // Focused border
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                                  ),
+                                ),
+                                style: TextStyle(fontSize: 14, color: Colors.black), // Smaller text size
+                                value: dataRows[index]["item"], // ✅ Now stored in dataRows,
+                                items: assetsDataItems,
+                                onChanged: (value) {
+                                  setState(() {
+                                    dataRows[index]["item"] = value;
+                                  });
+                                  if (kDebugMode) {
+                                    print("Selected Project Item ID: ${dataRows[index]["item"]}");
+                                  }
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(child: FormFieldItem(
+                              index: index,
+                              fieldKey: "quantity",
+                              label: "Quantity",
+                              controller: getController(index, "quantity"),
+                              onChanged: (value) => setState(() {
+                                dataRows[index]["quantity"] = value;
+                              }),
+                            )),
+                          ],
+                        ),
+                        SizedBox(height: 10,),
+                        Row(
+                          children: [
+                            Expanded(child: FormFieldItem(
+                              index: index,
+                              fieldKey: "price",
+                              label: "Price",
+                              controller: getController(index, "price"),
+                              onChanged: (value) => setState(() {
+                                dataRows[index]["price"] = value;
+                              }),
+                            )),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                decoration: InputDecoration(
+                                  labelText: "UOM *",
+                                  border: OutlineInputBorder( // Default border
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                                  ),
+                                  enabledBorder: OutlineInputBorder( // Unfocused border
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                                  ),
+                                  focusedBorder: OutlineInputBorder( // Focused border
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                                  ),
+                                ),
+                                style: TextStyle(fontSize: 14, color: Colors.black), // Smaller text size
+                                value: dataRows[index]["uom"],
+                                items: uomDataItems,
+                                onChanged: (value) {
+                                  setState(() {
+                                    dataRows[index]["uom"] = value;
+                                  });
+                                  if (kDebugMode) {
+                                    print("Selected Project UOM ID: ${dataRows[index]["uom"]}");
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 10,),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                decoration: InputDecoration(
+                                  labelText: "Receiver Status *",
+                                  border: OutlineInputBorder( // Default border
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                                  ),
+                                  enabledBorder: OutlineInputBorder( // Unfocused border
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                                  ),
+                                  focusedBorder: OutlineInputBorder( // Focused border
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                                  ),
+                                ),
+                                style: TextStyle(fontSize: 14, color: Colors.black), // Smaller text size
+                                value: dataRows[index]["qualityStatus"],
+                                items: qualityStatusItems,
+                                onChanged: (value) {
+                                  setState(() {
+                                    dataRows[index]["qualityStatus"] = value!;
+                                  });
+                                  if (kDebugMode) {
+                                    print("Selected Receiver Status ID: ${dataRows[index]["qualityStatus"]}");
+                                  }
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(child: FormFieldItem(
+                              index: index,
+                              fieldKey: "",
+                              label: "Receiver Remark",
+                              controller: getController(index, "receiverRemarks"), // Safe retrieval
+                              onChanged: (value) => setState(() {
+                                dataRows[index]["receiverRemarks"] = value;
+                              }),
+                            )),
+                          ],
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.save, color: Colors.blue,size: 30,),
+                              onPressed: () => {
 
-class FullScreenImage extends StatelessWidget {
-  final File imageFile;
+                                print(dataRows[index]["price"]),
+                                print(dataRows[index]["quantity"])
+                              },
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red,size: 30,),
+                              onPressed: () => removeRow(index),
+                            ),
+                          ],
+                        )
 
-  const FullScreenImage({Key? key, required this.imageFile}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        title: Text('Captured Image'),
-      ),
-      body: Center(
-        child: Image.file(
-          imageFile,
-          fit: BoxFit.contain,
+                      ],
+                    );
+                  },
+                )
+              ]
+            ],
+          ),
         ),
       ),
     );
   }
+
 }

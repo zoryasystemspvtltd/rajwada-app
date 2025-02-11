@@ -2,15 +2,24 @@
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../../api_url.dart';
 import '../model/login_data_model.dart';
 import '../model/user_privilege_model.dart';
 import '../service/shared_preference.dart';
 
 class AuthService {
+
+  //Login Service
   Future<LoginDataModel?> login(String email, String password) async {
     try {
-      final Uri url = Uri.parse(
-          'https://65.0.190.66/api/identity/login?useCookies=false&useSessionCookies=false');
+      final Uri url = Uri.https(
+        APIUrls.hostUrl, // Authority (host)
+        APIUrls.loginUrl, // Path
+        {
+          'useCookies': 'false',
+          'useSessionCookies': 'false',
+        }, // Query parameters
+      );
 
       final Map<String, String> headers = {
         'Content-Type': 'application/json',
@@ -54,7 +63,10 @@ class AuthService {
       String? token = await SharedPreference.getToken();
       if (token == null) return null;
 
-      final Uri url = Uri.parse('https://65.0.190.66/api/identity/getUserPrivileges');
+      final Uri url = Uri.https(
+        APIUrls.hostUrl, // Authority (host)
+        APIUrls.userPrivileges,
+      );
 
       final Map<String, String> headers = {
         'Content-Type': 'application/json',

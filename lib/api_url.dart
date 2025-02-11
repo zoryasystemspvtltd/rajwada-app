@@ -1,9 +1,15 @@
 class APIUrls {
 
-  static const String baseUrl = "https://65.0.190.66/api/identity/";
+  static const String hostUrl = "65.0.190.66";
 
-  static const String loginUrl = "login";
-  static const String getUserPrivileges = "getUserPrivileges";
-
+  static const String loginUrl = "/api/identity/login";
+  static const String refreshToken = "/api/identity/refresh";
+  static const String userPrivileges = "/api/identity/getUserPrivileges";
+  static const String qualityUser = "/api/user";
+  static const String userProject = "/api/Project";
+  static const String supplier = "/api/Supplier";
+  static const String asset = "/api/asset";
+  static const String uom = "/api/Uom";
+  static const String qualityStatus = "/api/enum/qualityStatus";
 
 }

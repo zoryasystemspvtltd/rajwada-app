@@ -3,12 +3,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:rajwada_app/ui/helper/app_colors.dart';
-import 'dart:async';
 
 import '../../core/functions/auth_function.dart';
 import '../../core/model/login_data_model.dart';
 import '../../core/model/user_privilege_model.dart';
-import '../../core/service/shared_preference.dart';
 import '../helper/assets_path.dart';
 
 class LoginScreen extends StatefulWidget {
