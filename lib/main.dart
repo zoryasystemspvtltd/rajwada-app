@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:rajwada_app/ui/screen/dashboard_screen.dart';
 import 'package:rajwada_app/ui/screen/login_screen.dart';
-import 'package:rajwada_app/ui/screen/login_screen1.dart';
 import 'package:rajwada_app/ui/screen/splash_screen.dart';
 import 'dart:io';
+
+import 'core/service/background_service.dart';
 
 class MyHttpOverrides extends HttpOverrides{
   @override
@@ -13,8 +14,10 @@ class MyHttpOverrides extends HttpOverrides{
   }
 }
 
-void main() {
+void main() async{
   HttpOverrides.global = MyHttpOverrides();
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeService();
   runApp(MyApp());
 }
 
@@ -23,6 +26,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Splash Screen Demo',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -30,7 +34,6 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
-        '/login1': (context) => const LoginScreen1(),
         '/dashboard': (context) => const DashboardScreen(),// Replace with your home screen
       },
     );

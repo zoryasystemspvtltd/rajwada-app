@@ -92,6 +92,30 @@
       "languageVersion": "3.3"
     },
     {
+      "name": "flutter_background_service",
+      "rootUri": "file:///Users/kunalmukherjee/.pub-cache/hosted/pub.dev/flutter_background_service-5.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "flutter_background_service_android",
+      "rootUri": "file:///Users/kunalmukherjee/.pub-cache/hosted/pub.dev/flutter_background_service_android-6.3.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "flutter_background_service_ios",
+      "rootUri": "file:///Users/kunalmukherjee/.pub-cache/hosted/pub.dev/flutter_background_service_ios-5.0.3",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
+      "name": "flutter_background_service_platform_interface",
+      "rootUri": "file:///Users/kunalmukherjee/.pub-cache/hosted/pub.dev/flutter_background_service_platform_interface-5.1.2",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
       "name": "flutter_lints",
       "rootUri": "file:///Users/kunalmukherjee/.pub-cache/hosted/pub.dev/flutter_lints-4.0.0",
       "packageUri": "lib/",
@@ -386,7 +410,7 @@
       "languageVersion": "3.5"
     }
   ],
-  "generated": "2025-02-04T18:07:07.748990Z",
+  "generated": "2025-02-11T11:19:05.172065Z",
   "generator": "pub",
   "generatorVersion": "3.6.0",
   "flutterRoot": "file:///Users/kunalmukherjee/development/flutter",

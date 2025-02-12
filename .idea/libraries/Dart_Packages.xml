@@ -107,6 +107,34 @@
             </list>
           </value>
         </entry>
+        <entry key="flutter_background_service">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/flutter_background_service-5.1.0/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="flutter_background_service_android">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/flutter_background_service_android-6.3.0/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="flutter_background_service_ios">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/flutter_background_service_ios-5.0.3/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="flutter_background_service_platform_interface">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/flutter_background_service_platform_interface-5.1.2/lib" />
+            </list>
+          </value>
+        </entry>
         <entry key="flutter_lints">
           <value>
             <list>
@@ -460,6 +488,10 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/file_selector_macos-0.9.4+2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/file_selector_platform_interface-2.6.2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/file_selector_windows-0.9.3+3/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/flutter_background_service-5.1.0/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/flutter_background_service_android-6.3.0/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/flutter_background_service_ios-5.0.3/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/flutter_background_service_platform_interface-5.1.2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/flutter_lints-4.0.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.24/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/http-1.3.0/lib" />
