@@ -5,19 +5,22 @@ class CustomTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final TextInputType? keyboardType;
+  final bool isEnabled; // New parameter
 
   const CustomTextField({
-    Key? key,
+    super.key,
     required this.label,
     required this.controller,
     required this.hintText,
     this.keyboardType,
-  }) : super(key: key);
+    this.isEnabled = true, // Default is enabled
+  });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      enabled: isEnabled, // Enable/Disable input
       keyboardType: keyboardType ?? TextInputType.text, // Default to text input
       decoration: InputDecoration(
         labelText: label,

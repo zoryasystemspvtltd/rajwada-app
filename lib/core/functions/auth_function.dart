@@ -68,6 +68,8 @@ class AuthService {
         APIUrls.userPrivileges,
       );
 
+      print("Token Value for Privilage: $token");
+
       final Map<String, String> headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',

@@ -6,15 +6,17 @@ class FormFieldItem extends StatelessWidget {
   final String label;
   final  TextEditingController controller;
   final Function(String) onChanged;
+  final bool isEnabled; // New parameter
 
   const FormFieldItem({
-    Key? key,
+    super.key,
     required this.index,
     required this.fieldKey,
     required this.label,
     required this.controller,
     required this.onChanged,
-  }) : super(key: key);
+    this.isEnabled = true, // Default is enabled
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -31,10 +33,10 @@ class FormFieldItem extends StatelessWidget {
       keyboardType = TextInputType.text;
     }
 
-
     return TextField(
       keyboardType: keyboardType,
       controller: controller,
+      enabled: isEnabled,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),

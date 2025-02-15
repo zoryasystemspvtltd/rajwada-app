@@ -6,11 +6,11 @@ class AddTextDialog extends StatelessWidget {
   final VoidCallback onAdd;
 
   const AddTextDialog({
-    Key? key,
+    super.key,
     required this.textController,
     required this.onCancel,
     required this.onAdd,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
