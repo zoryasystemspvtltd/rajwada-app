@@ -11,5 +11,9 @@ class APIUrls {
   static const String asset = "/api/asset";
   static const String uom = "/api/Uom";
   static const String qualityStatus = "/api/enum/qualityStatus";
+  static const String fetchChallanList = "api/LevelSetup";
+  static const String fetchChallanDetail = "api/LevelSetup";
+  static const String fetchChallanDetailItem = "/api/levelSetupDetails";
+  static const String postChallanDetail = "api/LevelSetup";
 
 }

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:rajwada_app/core/service/shared_preference.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api_url.dart';
 
@@ -66,7 +65,6 @@ Future<void> fetchLoginData() async {
 
       await SharedPreference.saveToken(loginData.accessToken ?? '');
 
-
       print("✅ Login token updated: ${loginData.accessToken}");
     } else {
       print("❌ Login API failed: ${response.statusCode}");
@@ -90,13 +88,12 @@ Future<void> initializeService() async {
       onBackground: onIosBackground,
     ),
   );
-
   service.startService();
 }
 
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) {
-  Timer.periodic(Duration(minutes: 4), (timer) async {
+  Timer.periodic(const Duration(minutes: 4), (timer) async {
     if (service is AndroidServiceInstance) {
       if (await service.isForegroundService()) {
         await fetchLoginData();

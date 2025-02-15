@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 class CustomDateField extends StatefulWidget {
   final String label;
   final TextEditingController controller;
+  final bool isEnabled; // New parameter
 
   const CustomDateField({
-    Key? key,
+    super.key,
     required this.label,
     required this.controller,
-  }) : super(key: key);
+    this.isEnabled = true, // Default is enabled
+  });
 
   @override
   _CustomDateFieldState createState() => _CustomDateFieldState();
@@ -34,11 +36,12 @@ class _CustomDateFieldState extends State<CustomDateField> {
   Widget build(BuildContext context) {
     return TextField(
       controller: widget.controller,
+      enabled: widget.isEnabled, // Enable/Disable input
       decoration: InputDecoration(
         labelText: widget.label,
-        border: OutlineInputBorder(),
+        border: const OutlineInputBorder(),
         suffixIcon: IconButton(
-          icon: Icon(Icons.calendar_today),
+          icon: const Icon(Icons.calendar_today),
           onPressed: () => _selectDate(context),
         ),
       ),

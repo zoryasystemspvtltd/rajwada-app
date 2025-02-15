@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:rajwada_app/core/model/challan_list.dart';
 import '../../api_url.dart';
 import '../model/asset_data_model.dart';
+import '../model/challan_detailItem_model.dart';
+import '../model/challan_detail_model.dart';
 import '../model/quality_status_model.dart';
 import '../model/quality_user_model.dart';
 import '../model/supplier_data_model.dart';
@@ -36,7 +40,7 @@ class RestFunction{
           );
         }).toList();
 
-        return [DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
+        return [const DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
 
         // Convert list of users to DropdownMenuItems
         return userModel.items.map((user) {
@@ -85,7 +89,7 @@ class RestFunction{
           );
         }).toList();
 
-        return [DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
+        return [const DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
       } else {
         print('Failed to fetch user project data: ${response.statusCode}');
         return [];
@@ -126,7 +130,7 @@ class RestFunction{
           );
         }).toList();
 
-        return [DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
+        return [const DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
       } else {
         print('Failed to fetch supplier data: ${response.statusCode}');
         return [];
@@ -167,7 +171,7 @@ class RestFunction{
           );
         }).toList();
 
-        return [DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
+        return [const DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
       } else {
         print('Failed to fetch uom data: ${response.statusCode}');
         return [];
@@ -208,7 +212,7 @@ class RestFunction{
           );
         }).toList();
 
-        return [DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
+        return [const DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
       } else {
         print('Failed to fetch asset data: ${response.statusCode}');
         return [];
@@ -251,14 +255,142 @@ class RestFunction{
           );
         }).toList();
 
-        return [DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems]; // Include default option
+        return [const DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems]; // Include default option
       } else {
         print('Failed to fetch quality status data: ${response.statusCode}');
-        return [];;
+        return [];
       }
     } catch (e) {
       print('Error fetching quality status data: $e');
-      return [];;
+      return [];
+    }
+  }
+
+  //Fetch Challan List
+  static Future<ChallanListModel?> fetchChallanList({int currentPage = 1, int recordPerPage = 15}) async {
+    try {
+      String? token = await SharedPreference.getToken();
+
+      if (token == null || token.isEmpty) {
+        print("Error: Token is null or empty. User might not be logged in.");
+        return null;
+      }
+
+      final Uri url = Uri.https(
+        APIUrls.hostUrl,
+        APIUrls.fetchChallanList,
+        {
+          "currentPage": currentPage.toString(),  // 👈 Adding query parameters
+          "recordPerPage": recordPerPage.toString(),
+        },
+      );
+
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+      final http.Response response = await http.get( // 🔹 Use POST instead of GET
+        url,
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        print('Response Body: ${response.body}'); // 👀 Check what API returns
+        final jsonData = json.decode(response.body);
+        ChallanListModel challanList = ChallanListModel.fromJson(jsonData);
+        return challanList;
+      } else {
+        print('Challan list fetch failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error during challan list fetch: $e');
+      return null;
+    }
+  }
+
+  //Fetch Challan Detail
+  static Future<ChallanDetailModel?> fetchChallanDetail(int challanId) async {
+    try {
+      String? token = await SharedPreference.getToken();
+
+      // If token is null, return a default list instead of null
+      if (token == null) return null;
+
+      final Uri url = Uri.https(
+        APIUrls.hostUrl, // Authority (host)
+        "${APIUrls.fetchChallanDetail}/$challanId", // Path
+      );
+
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+      final http.Response response = await http.get(
+        url,
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        // Parse response into LoginDataModel
+        final jsonData = json.decode(response.body);
+        ChallanDetailModel challanDetail = ChallanDetailModel.fromJson(jsonData);
+        return challanDetail; // Return detail
+      } else {
+        print('fetch Challan Detail failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error during fetch Challan Detail: $e');
+      return null;
+    }
+  }
+
+  //Fetch Challan Detail Item
+  static Future<ChallanDetailItemModel?> fetchChallanDetailItem(int challanId) async {
+    try {
+      String? token = await SharedPreference.getToken();
+
+      // If token is null, return a default list instead of null
+      if (token == null) return null;
+
+      final Uri url = Uri.https(
+        APIUrls.hostUrl, // Authority (host)
+        APIUrls.fetchChallanDetailItem, // Path
+      );
+
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        'apioption': jsonEncode({
+          "currentPage": 1,
+          "recordPerPage": 0,
+          "searchCondition": {
+            "name": "headerId",
+            "value": challanId
+          }
+        }),
+      };
+
+      final http.Response response = await http.get(
+        url,
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        // Parse response into LoginDataModel
+        final jsonData = json.decode(response.body);
+        ChallanDetailItemModel challanDetailItem = ChallanDetailItemModel.fromJson(jsonData);
+        return challanDetailItem; // Return detail
+      } else {
+        print('fetch ChallanDetailItem failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error during fetch ChallanDetailItem: $e');
+      return null;
     }
   }
 
