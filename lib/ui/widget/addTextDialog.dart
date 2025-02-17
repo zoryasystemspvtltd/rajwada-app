@@ -53,3 +53,23 @@ void _showAddTextDialog(Map<String, dynamic> iconData, BuildContext context, Fun
     },
   );
 }
+
+void showErrorDialog(BuildContext context, String errorMessage) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text('Error'),
+        content: Text(errorMessage),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close the dialog
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      );
+    },
+  );
+}

@@ -38,7 +38,13 @@ class FormFieldItem extends StatelessWidget {
       controller: controller,
       enabled: isEnabled,
       decoration: InputDecoration(
+        fillColor: isEnabled ? Colors.white : Colors.white, // Set background color when disabled
+        filled: true, // Makes sure the fill color is applied
+        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Reduced padding
         labelText: label,
+        labelStyle: TextStyle(
+          color: isEnabled ? Colors.black : Colors.black54, // Change label color when disabled
+        ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
       ),
       onChanged: onChanged,

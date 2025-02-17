@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:intl/intl.dart';
+import 'package:rajwada_app/ui/screen/view_challan_data.dart';
 import '../../core/model/challan_list.dart';
 import '../screen/add_challan.dart';
 
@@ -14,7 +17,7 @@ class ChallanTable extends StatefulWidget {
 
 class _ChallanTableState extends State<ChallanTable> {
   bool _isAscending = true;
-  String _sortColumn = "project";
+  String _sortColumn = "documentDate";
   List<ChallanItem?> _sortedChallanItems = [];
 
   @override
@@ -40,6 +43,8 @@ class _ChallanTableState extends State<ChallanTable> {
           return _isAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
         } else if (aValue is int && bValue is int) {
           return _isAscending ? aValue - bValue : bValue - aValue;
+        } else if (aValue is DateTime && bValue is DateTime) {
+          return _isAscending ? aValue.compareTo(bValue) : bValue.compareTo(aValue);
         }
         return 0;
       });
@@ -48,8 +53,13 @@ class _ChallanTableState extends State<ChallanTable> {
 
   dynamic _getColumnValue(ChallanItem? item, String columnKey) {
     switch (columnKey) {
-      case "project":
-        return item?.projectName ?? "";
+      case "documentDate":
+        if (item?.documentDate is DateTime) {
+          return item?.documentDate;
+        } else if (item?.documentDate is String) {
+          return DateTime.tryParse(item!.documentDate.toString()) ?? DateTime(2000, 1, 1);
+        }
+        return DateTime(2000, 1, 1); // Default fallback date
       case "tracking":
         return item?.trackingNo ?? "";
       case "vehicle":
@@ -63,32 +73,28 @@ class _ChallanTableState extends State<ChallanTable> {
 
   Widget tableHeader(String title, String columnKey, int flex) {
     return Expanded(
-      flex: flex, // Individual flex for each column
+      flex: flex,
       child: InkWell(
-        onTap: () {
-          if (columnKey == "project") {
-            _sortList(columnKey);
-          }
-        },
+        onTap: () => _sortList(columnKey), // ✅ Trigger sorting
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               title,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 12),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontSize: 12,
+              ),
             ),
-            if (columnKey == "project") // Show sort icon only for Project column
-              Row(
-                children: [
-                  const SizedBox(width: 5),
-                  Icon(
-                    _sortColumn == columnKey
-                        ? (_isAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                        : Icons.swap_vert,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ],
+            if (_sortColumn == columnKey) // ✅ Show arrow only for sorted column
+              Padding(
+                padding: const EdgeInsets.only(left: 5),
+                child: Icon(
+                  _isAscending ? Icons.arrow_upward : Icons.arrow_downward, // ✅ Dynamic arrow
+                  size: 16,
+                  color: Colors.white,
+                ),
               ),
           ],
         ),
@@ -117,11 +123,11 @@ class _ChallanTableState extends State<ChallanTable> {
           // Table Header
           Container(
             color: Colors.red,
-            padding: const EdgeInsets.symmetric(vertical: 10),
+            padding: const EdgeInsets.symmetric(vertical: 20),
             child: Row(
               children: [
                 tableHeader("#", "index", 1),       // Smallest flex
-                tableHeader("Project", "project", 3), // Larger flex
+                tableHeader("Document Date", "documentDate", 5), // ✅ Fix columnKey
                 tableHeader("Tracking No", "tracking", 4),
                 tableHeader("Vehicle No", "vehicle", 4),
                 tableHeader("Supplier Name", "supplier", 4),
@@ -139,15 +145,44 @@ class _ChallanTableState extends State<ChallanTable> {
                   return const Center(child: CircularProgressIndicator()); // ✅ Show loader at the end
                 }
                 final item = _sortedChallanItems[index]; // ✅ Access item safely
-                return InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ChallanEntryScreen(isEdit: true,challanId: _sortedChallanItems[index]?.id ?? 0), // Default to 0 if null
+                
+                return Slidable(
+                  key: ValueKey(item?.id), // Unique key for each item
+                  endActionPane: ActionPane(
+                    motion: const ScrollMotion(), // Slide animation
+                    children: [
+                      // ✅ View Button
+                      SlidableAction(
+                        onPressed: (context) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ViewChallanScreen(challanId: item?.id ?? 0, challanData: item),
+                            ),
+                          );
+                        },
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        icon: Icons.visibility,
+                        label: 'View',
                       ),
-                    );
-                  },
+                      // ✅ Edit Button
+                      SlidableAction(
+                        onPressed: (context) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChallanEntryScreen(isEdit: true, challanId: item?.id ?? 0),
+                            ),
+                          );
+                        },
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        icon: Icons.edit,
+                        label: 'Edit',
+                      ),
+                    ],
+                  ),
                   child: Container(
                     margin: const EdgeInsets.only(left: 5),
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -158,10 +193,22 @@ class _ChallanTableState extends State<ChallanTable> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         tableCell((index + 1).toString(), flex: 1),
-                        tableCell(item?.projectName ?? "N/A", flex: 3, isBold: true),
+                        tableCell(
+                            item?.documentDate is DateTime
+                                ? DateFormat('yyyy-MM-dd')
+                                    .format(item!.documentDate as DateTime)
+                                : (item?.documentDate is String
+                                    ? DateFormat('yyyy-MM-dd').format(
+                                        DateTime.tryParse(item!.documentDate
+                                                .toString()) ??
+                                            DateTime(2000, 1, 1),
+                                      )
+                                    : "N/A"),
+                            flex: 4),
                         tableCell(item?.trackingNo ?? "N/A", flex: 4),
                         tableCell(item?.vechileNo ?? "N/A", flex: 4),
-                        tableCell(item?.supplierName?.toString() ?? "N/A", flex: 4),
+                        tableCell(item?.supplierName?.toString() ?? "N/A",
+                            flex: 4),
                       ],
                     ),
                   ),
