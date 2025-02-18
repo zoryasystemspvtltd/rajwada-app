@@ -55,7 +55,7 @@ class ChallanItem {
   String? projectName;
   String? vechileNo;
   String? trackingNo;
-  DateTime? documentDate;
+  String? documentDate;
   String? supplierId;
   String? supplierName;
   dynamic remarks;
@@ -100,7 +100,7 @@ class ChallanItem {
     projectName: json["projectName"] ?? "",
     vechileNo: json["vechileNo"] ?? "",
     trackingNo: json["trackingNo"] ?? "",
-    documentDate: json["documentDate"] != null ? DateTime.tryParse(json["documentDate"]) : null,
+    documentDate: json["documentDate"],
     supplierId: json["supplierId"] ?? "",
     supplierName: json["supplierName"] ?? "",
     remarks: json["remarks"],
@@ -123,7 +123,7 @@ class ChallanItem {
     "projectName": projectName,
     "vechileNo": vechileNo,
     "trackingNo": trackingNo,
-    "documentDate": documentDate?.toIso8601String(),
+    "documentDate": documentDate,
     "supplierId": supplierId,
     "supplierName": supplierNameValues.reverse[supplierName],
     "remarks": remarks,

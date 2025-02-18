@@ -23,6 +23,7 @@ class CustomTextField extends StatelessWidget {
       enabled: isEnabled, // Enable/Disable input
       keyboardType: keyboardType ?? TextInputType.text, // Default to text input
       decoration: InputDecoration(
+        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Adjusts padding
         labelText: label,
         hintText: hintText,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),

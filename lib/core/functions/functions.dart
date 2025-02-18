@@ -7,6 +7,8 @@ import '../../api_url.dart';
 import '../model/asset_data_model.dart';
 import '../model/challan_detailItem_model.dart';
 import '../model/challan_detail_model.dart';
+import '../model/challan_status_model.dart';
+import '../model/project_detail_model.dart';
 import '../model/quality_status_model.dart';
 import '../model/quality_user_model.dart';
 import '../model/supplier_data_model.dart';
@@ -390,6 +392,81 @@ class RestFunction{
       }
     } catch (e) {
       print('Error during fetch ChallanDetailItem: $e');
+      return null;
+    }
+  }
+
+  // Function to fetch and parse the data from the API
+  static Future<List<ChallanStatusModel>?> fetchChallanStatus() async {
+
+    try {
+      String? token = await SharedPreference.getToken();
+
+      // If token is null, return a default list instead of null
+      if (token == null) return null;
+
+      final Uri url = Uri.https(
+        APIUrls.hostUrl, // Authority (host)
+        APIUrls.challanStatus, // Path
+      );
+
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+      final http.Response response = await http.get(
+        url,
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        // Parse response into LoginDataModel
+        return challanStatusModelFromJson(response.body);
+      } else {
+        print('fetch Challan Status failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error during fetch Challan Status: $e');
+      return null;
+    }
+  }
+
+  // Fetch Project Detail
+  static Future<ProjectDetailModel?> fetchProjectDetail(String projectId) async {
+    try {
+      String? token = await SharedPreference.getToken();
+
+      // If token is null, return a default list instead of null
+      if (token == null) return null;
+
+      final Uri url = Uri.https(
+        APIUrls.hostUrl, // Authority (host)
+        "${APIUrls.fetchProjectDetail}/$projectId", // Path
+      );
+
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+      final http.Response response = await http.get(
+        url,
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        // Parse response into LoginDataModel
+        final jsonData = json.decode(response.body);
+        ProjectDetailModel projectDetail = ProjectDetailModel.fromJson(jsonData);
+        return projectDetail; // Return detail
+      } else {
+        print('fetch ProjectDetail failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error during fetch ProjectDetail: $e');
       return null;
     }
   }

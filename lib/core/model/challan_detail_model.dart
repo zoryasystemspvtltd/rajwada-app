@@ -11,7 +11,7 @@ class ChallanDetailModel {
   String? projectName;
   String? vechileNo;
   String? trackingNo;
-  DateTime? documentDate;
+  String? documentDate;
   String? supplierId;
   String? supplierName;
   dynamic remarks;
@@ -56,7 +56,7 @@ class ChallanDetailModel {
     projectName: json["projectName"],
     vechileNo: json["vechileNo"],
     trackingNo: json["trackingNo"],
-    documentDate: json["documentDate"] == null ? null : DateTime.parse(json["documentDate"]),
+    documentDate: json["documentDate"],
     supplierId: json["supplierId"],
     supplierName: json["supplierName"],
     remarks: json["remarks"],
@@ -79,7 +79,7 @@ class ChallanDetailModel {
     "projectName": projectName,
     "vechileNo": vechileNo,
     "trackingNo": trackingNo,
-    "documentDate": documentDate?.toIso8601String(),
+    "documentDate": documentDate,
     "supplierId": supplierId,
     "supplierName": supplierName,
     "remarks": remarks,
