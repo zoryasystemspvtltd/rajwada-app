@@ -182,7 +182,7 @@ class _ChallanTableState extends State<ChallanTable> {
                 primary: false, // ✅ Prevents conflicts if inside another scrollable widget
                 itemBuilder: (context, index) {
                   if (index == _sortedChallanItems.length) {
-                    return isLoading ? const Center(child: CircularProgressIndicator()) : SizedBox(); // ✅ Show loader only when loading
+                    return isLoading ? const Center(child: CircularProgressIndicator()) : const SizedBox(); // ✅ Show loader only when loading
                   }
 
                   final item = _sortedChallanItems[index];

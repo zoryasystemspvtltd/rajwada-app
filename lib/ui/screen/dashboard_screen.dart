@@ -204,6 +204,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         if (menuItems[index]["title"] == "Logout") {
                           authService.logout();
                           Navigator.pushReplacementNamed(context, '/login');
+                        } else if (menuItems[index]["title"] == "Activity Reporting") {
+                          Navigator.pushNamed(context, '/activity');
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(
@@ -251,8 +253,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: TextField(
                     controller: searchController,
                     decoration: InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(vertical: 10),
-                      prefixIcon: Icon(Icons.search),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      prefixIcon: const Icon(Icons.search),
                       hintText: "Search",
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(5),

@@ -37,7 +37,7 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
   String userRole = "";
   String userEmail = "";
   UserPrivilegeModel? userPrivilege;
-  TextEditingController _remarksController = TextEditingController();
+  final TextEditingController _remarksController = TextEditingController();
   bool? approveTapped = false;
 
   // Method to load user privileges from SharedPreferences

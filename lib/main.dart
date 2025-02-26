@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rajwada_app/ui/screen/activity_reporting.dart';
 import 'package:rajwada_app/ui/screen/add_challan.dart';
 import 'package:rajwada_app/ui/screen/dashboard_screen.dart';
 import 'package:rajwada_app/ui/screen/login_screen.dart';
@@ -39,6 +40,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/dashboard': (context) => const DashboardScreen(),// Replace with your home screen
         '/addChallan': (context) => const ChallanEntryScreen(isEdit: false,challanId: 0,),
+        '/activity': (context) => const ActivityReport()
       },
     );
   }

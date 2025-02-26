@@ -1011,7 +1011,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                 setState(() {
                                   selectedQuantityInChargeId = value!;
                                   // ✅ Find the selected user from dropdown items
-                                  final selectedItem = quantityInChargeItems?.firstWhere(
+                                  final selectedItem = quantityInChargeItems.firstWhere(
                                         (item) => item.value == selectedQuantityInChargeId,
                                     orElse: () => const DropdownMenuItem<int>(
                                       value: -1,
@@ -1026,8 +1026,8 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                   );
 
                                   // ✅ Extract Name & Email (Ensure child is a Row)
-                                  if (selectedItem?.child is Row) {
-                                    final rowChildren = (selectedItem?.child as Row).children;
+                                  if (selectedItem.child is Row) {
+                                    final rowChildren = (selectedItem.child as Row).children;
 
                                     // Extract Name
                                     if (rowChildren.isNotEmpty && rowChildren[0] is Text) {
