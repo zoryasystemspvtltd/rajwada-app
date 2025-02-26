@@ -1,12 +1,17 @@
 
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:rajwada_app/core/functions/auth_function.dart';
 import 'package:rajwada_app/core/model/login_data_model.dart';
 import 'package:rajwada_app/ui/helper/app_colors.dart';
 import 'package:rajwada_app/ui/helper/assets_path.dart';
 import 'package:rajwada_app/ui/screen/add_challan.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/functions/functions.dart';
 import '../../core/model/challan_list.dart';
+import '../../core/model/user_privilege_model.dart';
 import '../widget/challan_table.dart';
 
 
@@ -37,41 +42,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int currentPage = 1;
   final ScrollController _scrollController = ScrollController();
   bool hasMoreData = true;
+  UserPrivilegeModel? userPrivilege;
+  String userRole = "";
+  final TextEditingController searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     fetchChallanData(currentPage);
+    loadUserPrivileges();
 
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100 && !isLoading) {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100 &&
+          !isLoading && hasMoreData) {
         fetchChallanData(currentPage); // ✅ Load next page when reaching bottom
       }
     });
   }
 
+  // Method to load user privileges from SharedPreferences
+  Future<void> loadUserPrivileges() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? userPrivilegeJson = prefs.getString('userPrivileges');
 
-  // Future<void> fetchChallanData(int currentPage) async {
-  //   if (isLoading || !hasMoreData) return; // Prevent duplicate calls
-  //
-  //   isLoading = true;
-  //
-  //   ChallanListModel? response = await RestFunction.fetchChallanList(
-  //     currentPage: currentPage,
-  //     recordPerPage: 15,
-  //   );
-  //
-  //   if (response != null) {
-  //     if (response.items.isNotEmpty) {
-  //       challanListData.addAll(response.items);
-  //       currentPage++; // Increment page number
-  //     } else {
-  //       hasMoreData = false; // No more data available
-  //     }
-  //   }
-  //
-  //   isLoading = false;
-  // }
+    if (userPrivilegeJson != null) {
+      Map<String, dynamic> jsonMap = jsonDecode(userPrivilegeJson);
+      userPrivilege = UserPrivilegeModel.fromJson(jsonMap);
+    }
+
+    printRoles(); // Call printRoles() after loading data
+  }
+
+  // Method to print roles
+  void printRoles() {
+    if (userPrivilege != null && userPrivilege!.roles != null) {
+      userRole = userPrivilege!.roles!.join(', ');
+      print("User Roles: $userRole");
+    } else {
+      print("No roles found.");
+    }
+  }
 
   Future<void> fetchChallanData(int pageNumber) async {
     if (isLoading) return; // ✅ Prevent duplicate API calls
@@ -85,14 +95,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
       recordPerPage: 15,
     );
 
+    if (kDebugMode) {
+      print("Page Number: $pageNumber");
+    }
+
     if (mounted) {
       setState(() {
         isLoading = false;
-        challanListData.addAll(response?.items ?? []);
-        currentPage++; // Increment page number
+        if (response?.items.isNotEmpty ?? false) {
+          challanListData.addAll(response!.items);
+          currentPage++; // ✅ Increment page number only if new data is available
+        }
       });
     }
   }
+
+  // Future<void> fetchChallanData(int pageNumber) async {
+  //   if (isLoading) return; // ✅ Prevent duplicate API calls
+  //
+  //   setState(() {
+  //     isLoading = true;
+  //   });
+  //
+  //   ChallanListModel? response = await RestFunction.fetchChallanList(
+  //     currentPage: pageNumber,
+  //     recordPerPage: 15,
+  //   );
+  //
+  //   if (kDebugMode) {
+  //     print("Page Number: $pageNumber");
+  //   }
+  //
+  //   if (mounted) {
+  //     setState(() {
+  //       isLoading = false;
+  //       challanListData.addAll(response?.items ?? []);
+  //       currentPage++; // Increment page number
+  //     });
+  //   }
+  // }
 
 
   @override
@@ -185,46 +226,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
-                ElevatedButton(
-                  onPressed: () {
-                    // Navigate to dashboard if login is successful
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ChallanEntryScreen(isEdit: false, challanId: 0),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                  child: const Text(
-                      "Add New", style: TextStyle(color: Colors.white)),
+                Visibility(
+                  visible: userRole == "Receiver",
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChallanEntryScreen(isEdit: false, challanId: 0),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text(
+                      "Add New",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
                 ),
                 const Spacer(),
-                // Container(
-                //   width: 200,
-                //   height: 40,
-                //   child: TextField(
-                //     controller: _searchController,
-                //     decoration: InputDecoration(
-                //       contentPadding: EdgeInsets.symmetric(vertical: 10),
-                //       prefixIcon: Icon(Icons.search),
-                //       hintText: "Search",
-                //       border: OutlineInputBorder(
-                //         borderRadius: BorderRadius.circular(5),
-                //       ),
-                //       filled: true,
-                //       fillColor: Colors.white,
-                //     ),
-                //   ),
-                // ),
+                SizedBox(
+                  width: 140,
+                  height: 40,
+                  child: TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      prefixIcon: Icon(Icons.search),
+                      hintText: "Search",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 10),
-                // ElevatedButton(
-                //   onPressed: () {
-                //     // Implement search logic
-                //   },
-                //   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                //   child: Text("Search", style: TextStyle(color: Colors.white)),
-                // ),
+                ElevatedButton(
+                  onPressed: () {
+                    // Implement search logic
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text("Search", style: TextStyle(color: Colors.white,fontSize: 14)),
+                ),
               ],
             ),
           ),
@@ -234,7 +279,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               : challanData != null
               ? const Center(
               child: Text("No data available")) // Handle null case
-              : ChallanTable(challanItems: challanListData, controllScroll: _scrollController,), // Pass API data
+              : ChallanTable(challanItems: challanListData, controllScroll: _scrollController, userRole: userRole), // Pass API data
         ],
       ),
     );

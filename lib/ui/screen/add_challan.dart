@@ -4,11 +4,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rajwada_app/core/model/challan_detailItem_model.dart';
+import 'package:rajwada_app/core/model/user_privilege_model.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/functions/auth_function.dart';
 import '../../core/functions/functions.dart';
 import '../../core/model/challan_detail_model.dart';
+import '../../core/model/challan_status_model.dart';
 import '../../core/model/login_data_model.dart';
+import '../../core/model/quality_status_model.dart';
+import '../../core/model/quality_user_model.dart';
 import '../../core/service/shared_preference.dart';
 import '../helper/app_colors.dart';
 import '../widget/addTextDialog.dart';
@@ -34,6 +39,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
   final RestFunction restService = RestFunction();
   final LoginDataModel loginModel = LoginDataModel();
 
+
   final TextEditingController trackingNoController = TextEditingController();
   final TextEditingController vehicleNoController = TextEditingController();
   final TextEditingController documentDateController = TextEditingController();
@@ -48,6 +54,8 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
 
   List<DropdownMenuItem<int>> userProjectItems = [];
   List<DropdownMenuItem<int>> quantityInChargeItems = [];
+  List<DropdownMenuItem<int>> assignForApprovalItems = [];
+
   List<DropdownMenuItem<int>> supplierDataItems = [];
 
   List<DropdownMenuItem<int>> assetsDataItems = [];
@@ -57,21 +65,28 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
   int? selectedProjectId;
   int? selectedQuantityInChargeId; // Default selected ID
   int? selectedSupplierId;
+  int? selectedForApprovalId;
 
   int? selectedAssetId;
   int? selectedUomId;
   int? selectedReceiverStatusId; // Default selected ID
+  int? selectedQualityStatusId;
 
   bool? showListView; // Initially hidden
   Map<int, Map<String, TextEditingController>> controllers = {};
   ChallanDetailModel? _challanDetail;
   ChallanDetailItemModel? _challanDetailItem;
+  UserPrivilegeModel? userPrivilege;
+  QualityUserModel? userModel;
 
   bool? isEnabled; // Allows user interaction
 
   String selectedProjectName = ""; // Stores the corresponding project name
   String selectedQualityInChargeName =
       ""; // Stores the corresponding QualityInCharge Name
+  String selectedForApprovalName = "";
+  String selectedForApprovalEmail = "";
+  String selectedQualityInChargeEmail = "";
   String selectedSupplierName = ""; // Stores the corresponding Supplier Name
   String selectedItemName = "";
   String selectedUomName = "";
@@ -79,14 +94,19 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
   String selectedItemPrice = "";
   String selectedItemQuantity = "";
   String selectedReceiverRemark = "";
+  String selectedQualityStatusName = "";
+  String selectedQualityStatusRemark = "";
+  String userRole = "";
 
   int? apiResponseValue; // Variable to store the integer response
   bool isLoading = false; // Loader state
-  bool? savePressed;
+  bool? savePressed = false;
 
   String challanItemID = "";
 
   List<Map<String, dynamic>> dataRows = [];
+  List<ChallanStatusModel> _statusList = [];
+
 
   Future<void> sendItemDataForEditToAPI() async {
     setState(() {
@@ -115,6 +135,8 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
       "receiverStatus": selectedReceiverStatusId.toString(),
       "uomId": selectedUomId.toString(),
       "uomName": selectedUomName,
+      "qualityStatus": selectedQualityStatusId.toString(),
+      "qualityRemarks": selectedQualityStatusRemark
     };
     if (kDebugMode) {
       print("URL: $apiUrl");
@@ -318,6 +340,143 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     }
   }
 
+  Future<void> sendFullDataToAPI() async {
+    setState(() {
+      isLoading = true; // Show loader before API call
+    });
+    String? token = await SharedPreference.getToken();
+    if (token == null) return; // Return null if token is missing
+
+    String apiUrl = "https://65.0.190.66/api/LevelSetup/$apiResponseValue";
+
+    // Request body
+    Map<String, String> requestBody = {
+      "projectId": selectedProjectId.toString(),
+      "projectName": selectedProjectName,
+      "inChargeId": selectedQuantityInChargeId.toString(),
+      "inChargeName": selectedQualityInChargeName,
+      "documentDate": documentDateController.text,
+      "supplierId": selectedSupplierId.toString(),
+      "supplierName": selectedSupplierName,
+      "trackingNo": trackingNoController.text,
+      "vechileNo": vehicleNoController.text,
+    };
+
+    if (kDebugMode) {
+      print("Request Body: $requestBody");
+      print("Token: $token");
+    }
+
+    try {
+      final response = await http.put(
+        Uri.parse(apiUrl),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() async {
+          isLoading = false; // Hide loader after API response
+          await sendPatchData();
+        });
+
+        if (kDebugMode) {
+          print("API Response Value: $apiResponseValue");
+        }
+      } else {
+        setState(() {
+          isLoading = false; // Hide loader after API response
+        });
+        if (kDebugMode) {
+          print("Failed to send data: ${response.statusCode}");
+        }
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false; // Hide loader after API response
+      });
+      if (kDebugMode) {
+        print("Error: $e");
+      }
+    }
+  }
+
+  Future<void> sendPatchData() async {
+    setState(() {
+      isLoading = true; // Show loader before API call
+    });
+    String? token = await SharedPreference.getToken();
+    if (token == null) return; // Return null if token is missing
+    String apiUrl = "";
+
+    if(userRole == "Quality Engineer"){
+      apiUrl = "https://65.0.190.66/api/LevelSetup/${_challanDetail?.id}";
+    } else{
+      apiUrl = "https://65.0.190.66/api/LevelSetup/$apiResponseValue";
+    }
+
+
+    // Request body
+    Map<String, String> requestBody = {
+      "id": userRole == "Quality Engineer" ? "${_challanDetail?.id}" : apiResponseValue.toString(),
+      "member" : userRole == "Quality Engineer" ? selectedForApprovalEmail : selectedQualityInChargeEmail,
+      "status": userRole == "Quality Engineer" ?  "3" : "2"
+    };
+
+    if (kDebugMode) {
+      print("Request Body: $requestBody");
+      print("Token: $token");
+    }
+
+    try {
+      final response = await http.patch(
+        Uri.parse(apiUrl),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          isLoading = false; // Hide loader after API response
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  "Challan Patched Successfully",
+                  style: TextStyle(fontSize: 16, color: Colors.green, fontWeight: FontWeight.normal),
+                ),
+                duration: Duration(seconds: 2),
+              )
+          );
+        });
+
+        if (kDebugMode) {
+          print("API Response Value: $apiResponseValue");
+        }
+      } else {
+        setState(() {
+          isLoading = false; // Hide loader after API response
+        });
+        if (kDebugMode) {
+          print("Failed to send data: ${response.statusCode}");
+        }
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false; // Hide loader after API response
+      });
+      if (kDebugMode) {
+        print("Error: $e");
+      }
+    }
+  }
+
   //Fetch Pre Data Sets
   void getUserData() async {
     List<DropdownMenuItem<int>> items =
@@ -328,6 +487,18 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
       });
     }
   }
+
+  void getAssignForApprovalData() async {
+    List<DropdownMenuItem<int>> items =
+    await RestFunction.fetchAssignForApprovalUsersDropdown();
+    if (mounted) {
+      setState(() {
+        assignForApprovalItems = items;
+      });
+    }
+  }
+
+
 
   void getUserProjects() async {
     List<DropdownMenuItem<int>> items =
@@ -371,7 +542,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
 
   void getQualityStatus() async {
     List<DropdownMenuItem<int>> items =
-        await restService.fetchAndStoreQualityStatusData();
+        await RestFunction.fetchAndStoreQualityStatusData();
     if (mounted) {
       setState(() {
         qualityStatusItems = items;
@@ -385,6 +556,20 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     if (mounted) {
       setState(() {
         _challanDetail = data;
+      });
+    }
+  }
+
+  Future<void> fetchChallanStatus() async{
+    setState(() {
+      isLoading = true;
+    });
+
+    List<ChallanStatusModel>? data = await RestFunction.fetchChallanStatus();
+    if (mounted){
+      setState(() {
+        isLoading = false;
+        _statusList = data!;
       });
     }
   }
@@ -412,6 +597,8 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
               "quantity": item.quantity,
               "receiverRemarks": item.receiverRemarks,
               "receiverStatus": item.receiverStatus,
+              "qualityStatus": item.qualityStatus,
+              "qualityRemark": item.qualityRemarks,
               "uomId": item.uomId,
               "uomName": item.uomName,
             });
@@ -430,7 +617,9 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
   @override
   void initState() {
     super.initState();
+    loadUserPrivileges();
     getUserData();
+    getAssignForApprovalData();
     getUserProjects();
     getSupplier();
     getAssets();
@@ -438,13 +627,37 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     getQualityStatus();
     fetchChallanData();
     fetchChallanDetailItem();
+    fetchChallanStatus();
 
     if (widget.isEdit) {
       isEnabled = false;
       showListView = true;
     } else {
       isEnabled = true;
-      showListView = true;
+      showListView = false;
+    }
+  }
+
+  // Method to load user privileges from SharedPreferences
+  Future<void> loadUserPrivileges() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? userPrivilegeJson = prefs.getString('userPrivileges');
+
+    if (userPrivilegeJson != null) {
+      Map<String, dynamic> jsonMap = jsonDecode(userPrivilegeJson);
+      userPrivilege = UserPrivilegeModel.fromJson(jsonMap);
+    }
+
+    printRoles(); // Call printRoles() after loading data
+  }
+
+  // Method to print roles
+  void printRoles() {
+    if (userPrivilege != null && userPrivilege!.roles != null) {
+      userRole = userPrivilege!.roles!.join(', ');
+      print("User Roles: $userRole");
+    } else {
+      print("No roles found.");
     }
   }
 
@@ -546,6 +759,46 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     });
   }
 
+  String getQualityStatusLabel(String? receiverStatus) {
+    if (receiverStatus == null) return "";
+
+    // Convert receiverStatus to int
+    int? statusValue = int.tryParse(receiverStatus);
+
+    // Extract QualityStatusModel from DropdownMenuItem<int>
+    final matchedItem = qualityStatusItems
+        .map((item) => QualityStatusModel(
+      name: item.child is Text ? (item.child as Text).data : "Unknown",
+      value: item.value,
+    ))
+        .firstWhere(
+          (item) => item.value == statusValue,
+      orElse: () => QualityStatusModel(name: "Unknown", value: -1),
+    );
+
+    return matchedItem.name ?? "Unknown";
+  }
+
+  String getReceiverStatusLabel(String? receiverStatus) {
+    if (receiverStatus == null) return "";
+
+    // Convert receiverStatus to int
+    int? statusValue = int.tryParse(receiverStatus);
+
+    // Extract QualityStatusModel from DropdownMenuItem<int>
+    final matchedItem = qualityStatusItems
+        .map((item) => QualityStatusModel(
+      name: item.child is Text ? (item.child as Text).data : "Unknown",
+      value: item.value,
+    ))
+        .firstWhere(
+          (item) => item.value == statusValue,
+      orElse: () => QualityStatusModel(name: "Unknown", value: -1),
+    );
+
+    return matchedItem.name ?? "Unknown";
+  }
+
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
@@ -567,6 +820,89 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const SizedBox(
+                height: 20,
+              ),
+              Visibility(
+                visible: userRole == "Quality Engineer" && (_challanDetail?.status == 2 || _challanDetail?.status == 0),
+                child: SizedBox(
+                  height: 45,
+                  child: DropdownButtonFormField<int>(
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                      labelText: "Assign for Approval *",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                        borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                      ),
+                    ),
+                    style: const TextStyle(fontSize: 14, color: Colors.black),
+                    value: selectedForApprovalId,
+
+                    // ✅ Filter out the logged-in user from the list
+                    items: assignForApprovalItems
+                        .where((item) => item.value != userModel?.items[0].id) // Exclude logged-in user
+                        .toList(),
+
+                    onChanged: (widget.isEdit)
+                        ? (value) async {
+                      setState(() {
+                        selectedForApprovalId = value!;
+
+                        // ✅ Find the selected user from dropdown items
+                        final selectedItem = assignForApprovalItems.firstWhere(
+                              (item) => item.value == selectedForApprovalId,
+                          orElse: () => const DropdownMenuItem<int>(
+                            value: -1,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text("Unknown", style: TextStyle(fontSize: 14)),
+                                Text("No Email", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                        );
+
+                        // ✅ Extract Name & Email (Ensure child is a Row)
+                        if (selectedItem.child is Row) {
+                          final rowChildren = (selectedItem.child as Row).children;
+
+                          // Extract Name
+                          if (rowChildren.isNotEmpty && rowChildren[0] is Text) {
+                            print("Row Name: ${(rowChildren[0] as Text).data}");
+                            selectedForApprovalName = (rowChildren[0] as Text).data ?? "No Name";
+                          }
+
+                          // Extract Email (Check if at least two children exist)
+                          if (rowChildren.length > 1 && rowChildren[2] is Text) {
+                            selectedForApprovalEmail = (rowChildren[2] as Text).data ?? "No Email";
+                          }
+                        }
+
+                        if (kDebugMode) {
+                          print("Selected ForApproval ID: $selectedForApprovalId");
+                          print("Selected ForApproval Name: $selectedForApprovalName");
+                          print("Selected ForApproval Email: $selectedForApprovalEmail");
+                        }
+                      });
+                      await sendPatchData();
+                    }
+                        : null, // Disable dropdown interaction when editing
+
+
+                  ),
+                ),
+
+              ),
               const SizedBox(
                 height: 20,
               ),
@@ -674,28 +1010,51 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                             ? (value) {
                                 setState(() {
                                   selectedQuantityInChargeId = value!;
-                                  selectedQualityInChargeName =
-                                      (quantityInChargeItems
-                                                  .firstWhere(
-                                                      (item) =>
-                                                          item.value ==
-                                                          selectedQuantityInChargeId,
-                                                      orElse: () =>
-                                                          const DropdownMenuItem<
-                                                                  int>(
-                                                              value: null,
-                                                              child: Text('')))
-                                                  .child as Text)
-                                              .data ??
-                                          ""; // Extract text from Text widget
+                                  // ✅ Find the selected user from dropdown items
+                                  final selectedItem = quantityInChargeItems?.firstWhere(
+                                        (item) => item.value == selectedQuantityInChargeId,
+                                    orElse: () => const DropdownMenuItem<int>(
+                                      value: -1,
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text("Unknown", style: TextStyle(fontSize: 14)),
+                                          Text("No Email", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+
+                                  // ✅ Extract Name & Email (Ensure child is a Row)
+                                  if (selectedItem?.child is Row) {
+                                    final rowChildren = (selectedItem?.child as Row).children;
+
+                                    // Extract Name
+                                    if (rowChildren.isNotEmpty && rowChildren[0] is Text) {
+                                      print("Row Name: ${(rowChildren[0] as Text).data}");
+                                      selectedQualityInChargeName = (rowChildren[0] as Text).data ?? "No Name";
+                                    }
+
+                                    // Extract Email (Check if at least two children exist)
+                                    if (rowChildren.length > 1 && rowChildren[2] is Text) {
+                                      selectedQualityInChargeEmail = (rowChildren[2] as Text).data ?? "No Email";
+                                    }
+                                  }
+
+                                  if (kDebugMode) {
+                                    print("Selected ForApproval ID: $selectedQuantityInChargeId");
+                                    print("Selected ForApproval Name: $selectedQualityInChargeName");
+                                    print("Selected ForApproval Email: $selectedQualityInChargeEmail");
+                                    print("Save Pressed: $savePressed");
+                                  }
                                 });
 
-                                if (kDebugMode) {
-                                  print(
-                                      "Selected QualityInCharge ID: $selectedQuantityInChargeId");
-                                  print(
-                                      "Selected QualityInCharge Name: $selectedQualityInChargeName");
-                                }
+                                // if (kDebugMode) {
+                                //   print(
+                                //       "Selected QualityInCharge ID: $selectedQuantityInChargeId");
+                                //   print(
+                                //       "Selected QualityInCharge Name: $selectedQualityInChargeName");
+                                // }
                               }
                             : null, // Disable dropdown interaction
                       ),
@@ -823,7 +1182,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-              widget.isEdit == false
+              widget.isEdit == false && savePressed == false
                   ? Row(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
@@ -888,7 +1247,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                     const SizedBox(
                       width: 20,
                     ),
-                    IconButton(
+                    userRole == "Quality Engineer" ? const SizedBox.shrink() : IconButton(
                       icon: const Icon(
                         Icons.add_circle_rounded,
                         color: Colors.blue,
@@ -936,6 +1295,19 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                       children: [
                         Row(
                           children: [
+                            userRole == "Quality Engineer" ?
+                            Expanded(
+                                child: SizedBox(
+                                  height: 45,
+                                  child: FormFieldItem(
+                                    index: index,
+                                    fieldKey: "itemName",
+                                    isEnabled: false,
+                                    label:  _challanDetailItem!.items[index].name ?? "",
+                                    controller: getController(index, "itemName"),
+                                    onChanged: (String ) { },
+                                  ),
+                                )) :
                             Expanded(
                               child: SizedBox(
                                 height: 45,
@@ -1033,6 +1405,19 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                               ),
                             ),
                             const SizedBox(width: 10),
+                            userRole == "Quality Engineer" ?
+                            Expanded(
+                                child: SizedBox(
+                                  height: 45,
+                                  child: FormFieldItem(
+                                    index: index,
+                                    fieldKey: "quantity",
+                                    isEnabled: false,
+                                    label:  getController(index, "quantity").text.isNotEmpty ? "" : "Quantity",
+                                    controller: getController(index, "quantity"),
+                                    onChanged: (String ) { },
+                                  ),
+                                )) :
                             Expanded(
                                 child: SizedBox(
                               height: 45,
@@ -1063,6 +1448,19 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                         ),
                         Row(
                           children: [
+                            userRole == "Quality Engineer" ?
+                            Expanded(
+                                child: SizedBox(
+                                  height: 45,
+                                  child: FormFieldItem(
+                                    index: index,
+                                    fieldKey: "price",
+                                    isEnabled: false,
+                                    label:  getController(index, "price").text.isNotEmpty ? "" : "Price",
+                                    controller: getController(index, "price"),
+                                    onChanged: (String ) { },
+                                  ),
+                                )) :
                             Expanded(
                                 child: SizedBox(
                               height: 45,
@@ -1086,6 +1484,19 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                               ),
                             )),
                             const SizedBox(width: 10),
+                            userRole == "Quality Engineer" ?
+                            Expanded(
+                                child: SizedBox(
+                                  height: 45,
+                                  child: FormFieldItem(
+                                    index: index,
+                                    fieldKey: "uomName",
+                                    isEnabled: false,
+                                    label:  _challanDetailItem!.items[index].uomName ?? "",
+                                    controller: getController(index, "uomName"),
+                                    onChanged: (String ) { },
+                                  ),
+                                )) :
                             Expanded(
                               child: SizedBox(
                                 height: 45,
@@ -1183,11 +1594,154 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(
+                        userRole == "Quality Engineer" ? const SizedBox(
                           height: 10,
+                        ) : const SizedBox(
+                          height: 5,
                         ),
                         Row(
                           children: [
+                            userRole == "Quality Engineer" ?
+                            Expanded(
+                              child: SizedBox(
+                                height: 45,
+                                child: DropdownButtonFormField<int>(
+                                  decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Reduced padding
+                                    filled:
+                                    widget.isEdit ? isEnabled! : isEnabled,
+                                    // When disabled, apply a gray background
+                                    fillColor: widget.isEdit
+                                        ? Colors.grey.shade200
+                                        : Colors.white,
+                                    // Light gray background when disabled
+                                    labelText: "",
+                                    border: OutlineInputBorder(
+                                      // Default border
+                                      borderRadius: BorderRadius.circular(8.0),
+                                      borderSide: const BorderSide(
+                                          color: Colors.grey, width: 1.0),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      // Unfocused border
+                                      borderRadius: BorderRadius.circular(8.0),
+                                      borderSide: const BorderSide(
+                                          color: Colors.grey, width: 1.0),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      // Focused border
+                                      borderRadius: BorderRadius.circular(8.0),
+                                      borderSide: const BorderSide(
+                                          color: Colors.grey, width: 1.0),
+                                    ),
+                                  ),
+                                  style: const TextStyle(
+                                      fontSize: 14, color: Colors.black),
+                                  // Smaller text size
+                                  value: (widget.isEdit &&
+                                      _challanDetailItem!.items.length >
+                                          index)
+                                      ? int.tryParse(_challanDetailItem!
+                                      .items[index].qualityStatus
+                                      .toString())
+                                      : int.tryParse(dataRows[index]["qualityStatus"].toString()),
+                                  items: qualityStatusItems,
+                                  onChanged: !(widget.isEdit && isEnabled == true)
+                                      ? (value) {
+                                    setState(() {
+                                      if(_challanDetailItem!.items.isEmpty){
+                                        dataRows[index]["qualityStatus"] = value.toString();
+                                        selectedQualityStatusId = int.tryParse(dataRows[index]["qualityStatus"]);
+                                      } else{
+
+                                        _challanDetailItem!.items[index].qualityStatus = value.toString();
+                                        selectedQualityStatusId =
+                                            int.tryParse(_challanDetailItem!.items[index].qualityStatus ?? ""); // Store selected ID
+                                      }
+                                    });
+                                    if (kDebugMode) {
+                                      print(
+                                          "Selected Receiver Status ID: $selectedQualityStatusId, Name: $selectedReceiverStatusName}");
+                                    }
+                                  }
+                                      : null,
+                                ),
+                              ),
+                            ) :
+                            const SizedBox.shrink(),
+                            const SizedBox(width: 10),
+                            userRole == "Quality Engineer" ?
+                            Expanded(
+                                child: SizedBox(
+                                  height: 45,
+                                  child: FormFieldItem(
+                                    index: index,
+                                    fieldKey: "qualityRemarks",
+                                    isEnabled: true,
+                                    label:  _challanDetailItem!.items[index].qualityRemarks ?? "",
+                                    controller: getController(index, "qualityRemarks"),
+                                      onChanged: (value) => setState(() {
+                                        if (_challanDetailItem!.items.isEmpty) {
+                                          dataRows[index]["qualityRemarks"] =
+                                              value.toString();
+                                          selectedQualityStatusRemark = value;
+                                        } else {
+                                          _challanDetailItem!.items[index]
+                                              .qualityRemarks = value.toString();
+                                          selectedQualityStatusRemark = _challanDetailItem!
+                                              .items[index].qualityRemarks ??
+                                              "";
+                                        }
+                                      }),
+                                  ),
+                                )) :
+                            const SizedBox.shrink(),
+                            // Expanded(
+                            //     child: SizedBox(
+                            //       height: 45,
+                            //       child: FormFieldItem(
+                            //         index: index,
+                            //         fieldKey: "qualityRemarks",
+                            //         isEnabled: false,
+                            //         label:  _challanDetailItem!.items[index].qualityRemarks ?? "",
+                            //         controller: getController(index, "qualityRemarks"),
+                            //         onChanged: (value) => setState(() {
+                            //           if (_challanDetailItem!.items.isEmpty) {
+                            //             dataRows[index]["qualityRemarks"] =
+                            //                 value.toString();
+                            //             selectedQualityStatusRemark = value;
+                            //           } else {
+                            //             _challanDetailItem!.items[index]
+                            //                 .qualityRemarks = value.toString();
+                            //             selectedQualityStatusRemark = _challanDetailItem!
+                            //                 .items[index].qualityRemarks ??
+                            //                 "";
+                            //           }
+                            //         }),
+                            //       ),
+                            //     )),
+                          ],
+                        ),
+                        userRole == "Quality Engineer" ? const SizedBox(
+                          height: 10,
+                        ) : const SizedBox(
+                          height: 5,
+                        ),
+                        Row(
+                          children: [
+                            userRole == "Quality Engineer" ?
+                            Expanded(
+                                child: SizedBox(
+                                  height: 45,
+                                  child: FormFieldItem(
+                                    index: index,
+                                    fieldKey: "receiverStatus",
+                                    isEnabled: false,
+                                    label:  getReceiverStatusLabel(_challanDetailItem!.items[index].receiverStatus),
+                                    controller: getController(index, "receiverStatus"),
+                                    onChanged: (String ) { },
+                                  ),
+                                )) :
                             Expanded(
                               child: SizedBox(
                                 height: 45,
@@ -1255,6 +1809,19 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                               ),
                             ),
                             const SizedBox(width: 10),
+                            userRole == "Quality Engineer" ?
+                            Expanded(
+                                child: SizedBox(
+                                  height: 45,
+                                  child: FormFieldItem(
+                                    index: index,
+                                    fieldKey: "receiverRemarks",
+                                    isEnabled: false,
+                                    label:  _challanDetailItem!.items[index].receiverRemarks ?? "",
+                                    controller: getController(index, "receiverRemarks"),
+                                    onChanged: (String ) { },
+                                  ),
+                                )) :
                             Expanded(
                                 child: SizedBox(
                               height: 45,
@@ -1454,7 +2021,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                   DateTime documentDate = DateTime.parse(_challanDetail!.documentDate.toString());
                                   DateTime currentDate = DateTime.now();
 
-                                  // Compare only the date part (ignoring the time)
+                                  //Compare only the date part (ignoring the time)
                                   if (documentDate.year == currentDate.year &&
                                       documentDate.month == currentDate.month &&
                                       documentDate.day == currentDate.day) {
@@ -1498,6 +2065,14 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                           int.tryParse( _challanDetailItem
                                               ?.items[index].receiverStatus ??
                                               "");
+
+                                      selectedQualityStatusId = int.tryParse( _challanDetailItem
+                                          ?.items[index].qualityStatus ??
+                                          "");
+
+                                      // selectedQualityStatusRemark =  _challanDetailItem
+                                      //     ?.items[index].qualityRemarks ??
+                                      //     "";
                                     }
 
                                     setState(() {
@@ -1523,6 +2098,9 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                             "Selected Receiver Status Name: $selectedReceiverStatusName");
                                         print(
                                             "Selected Receiver Remark: $selectedReceiverRemark");
+
+                                        print("Selected Quality Status Name: $selectedQualityStatusId");
+                                        print("Selected Quality Status Remark: $selectedQualityStatusRemark");
                                       }
                                     });
                                     await sendItemDataForEditToAPI(); // Call the API function
@@ -1548,7 +2126,57 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                     );
                   },
                 )
-              ]
+              ],
+              const SizedBox(height: 10),
+              savePressed == true ? Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red),
+                    onPressed: () async {
+                      setState(() {
+                        if (kDebugMode) {
+                          print("Project Id: $selectedProjectId");
+                          print(
+                              "Project Name: $selectedProjectName");
+                          print(
+                              "Quality In Charge: $selectedQualityInChargeName");
+                          print(
+                              "Quality In Charge Id: $selectedQuantityInChargeId");
+                          print(
+                              "Tracking No: ${trackingNoController.text}");
+                          print(
+                              "Document Date: ${documentDateController.text}");
+                          print(
+                              "Vehicle No: ${vehicleNoController.text}");
+                          print("Supplier Id: $selectedSupplierId");
+                          print(
+                              "Supplier Name: $selectedSupplierName");
+                        }
+                      });
+                      await sendFullDataToAPI(); // Call the API function
+                    },
+                    child: const Text("Save",
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey),
+                    onPressed: () {
+                      setState(() {
+                        print(!widget.isEdit);
+                        Navigator.pop(context);
+                      });
+                    },
+                    child: const Text("Cancel",
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ) : const SizedBox.shrink()
             ],
           ),
         ),
