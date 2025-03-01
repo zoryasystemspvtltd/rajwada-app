@@ -107,6 +107,11 @@ class Item {
     this.key,
   });
 
+  @override
+  String toString() {
+    return 'Item{name: $name, date: $date}';
+  }
+
   factory Item.fromJson(Map<String, dynamic> json) => Item(
     description: json["description"] ?? "",  // Provide a default empty string
     type: typeValues.map[json["type"]],  // Remove `!` to prevent crash on null
