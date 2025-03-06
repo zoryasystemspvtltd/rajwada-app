@@ -470,7 +470,7 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                           ),
                         ),
                         TextSpan(
-                          text: DateFormat('yyyy-MM-dd').format(
+                          text: DateFormat('dd-MM-yyyy').format(
                               DateTime.parse(widget.challanData?.documentDate)), // Dynamic text
                           style: const TextStyle(
                             fontSize: 14, // Larger font size for project name

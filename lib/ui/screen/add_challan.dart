@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:rajwada_app/core/model/challan_detailItem_model.dart';
 import 'package:rajwada_app/core/model/user_privilege_model.dart';
+import 'package:rajwada_app/ui/screen/dashboard_screen.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/functions/auth_function.dart';
@@ -34,11 +37,13 @@ class ChallanEntryScreen extends StatefulWidget {
 }
 
 class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
-  //MARK: - Variable Declaration
+  ///MARK: - Variable Declaration
   final AuthService authService = AuthService(); // Initialize AuthService
   final RestFunction restService = RestFunction();
   final LoginDataModel loginModel = LoginDataModel();
 
+  XFile? _capturedImage;
+  final ImagePicker _picker = ImagePicker();
 
   final TextEditingController trackingNoController = TextEditingController();
   final TextEditingController vehicleNoController = TextEditingController();
@@ -107,6 +112,27 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
   List<Map<String, dynamic>> dataRows = [];
   List<ChallanStatusModel> _statusList = [];
 
+
+  Future<void> _openCamera() async {
+    // Open the device camera
+    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+    if (image != null) {
+      setState(() {
+        _capturedImage = image;
+      });
+    }
+  }
+
+  void _showFullScreenImage() {
+    if (_capturedImage == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FullScreenImage(imagePath: _capturedImage!.path),
+      ),
+    );
+  }
 
   Future<void> sendItemDataForEditToAPI() async {
     setState(() {
@@ -479,26 +505,43 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
 
   //Fetch Pre Data Sets
   void getUserData() async {
-    List<DropdownMenuItem<int>> items =
-        await RestFunction.fetchQualityUsersDropdown();
-    if (mounted) {
+    Map<String, dynamic> data = await RestFunction.fetchQualityUsersDropdown();
+
+    if (mounted && data.isNotEmpty) {
       setState(() {
-        quantityInChargeItems = items;
+        userModel = data["userModel"]; // ✅ Assign userModel properly
+        quantityInChargeItems = data["dropdownItems"];
       });
+
+      // ✅ Debug print to ensure userModel is populated
+      // if (kDebugMode) {
+      //   print("User Model Data Fetched:");
+      //   print("Total Records: ${userModel?.totalRecords}");
+      //   for (var user in userModel?.items ?? []) {
+      //     print("ID: ${user.id}, Name: ${user.name}, Email: ${user.email}");
+      //   }
+      // }
     }
   }
 
   void getAssignForApprovalData() async {
-    List<DropdownMenuItem<int>> items =
-    await RestFunction.fetchAssignForApprovalUsersDropdown();
-    if (mounted) {
+    Map<String, dynamic> data = await RestFunction.fetchAssignForApprovalUsersDropdown();
+    if (mounted && data.isNotEmpty) {
       setState(() {
-        assignForApprovalItems = items;
+        userModel = data["userModel"]; // ✅ Assign userModel properly
+        assignForApprovalItems = data["dropdownItems"];
       });
+
+      // ✅ Debug print to ensure userModel is populated
+      // if (kDebugMode) {
+      //   print("User Model Data Fetched:");
+      //   print("Total Records: ${userModel?.totalRecords}");
+      //   for (var user in userModel?.items ?? []) {
+      //     print("ID: ${user.id}, Name: ${user.name}, Email: ${user.email}");
+      //   }
+      // }
     }
   }
-
-
 
   void getUserProjects() async {
     List<DropdownMenuItem<int>> items =
@@ -824,81 +867,74 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                 height: 20,
               ),
               Visibility(
-                visible: userRole == "Quality Engineer" && (_challanDetail?.status == 2 || _challanDetail?.status == 0),
-                child: SizedBox(
-                  height: 45,
-                  child: DropdownButtonFormField<int>(
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                      labelText: "Assign for Approval *",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                visible: userRole == "Quality Engineer" && (_challanDetail?.status == 2 || _challanDetail?.status == 0 || _challanDetail?.status == 3),
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: SizedBox(
+                    height: 45,
+                    width: 210,
+                    child: DropdownButtonFormField<int>(
+                      decoration: InputDecoration(
+                        labelStyle: const TextStyle(fontSize: 14, color: Colors.black),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                        labelText: "Assign for Approval *",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                        ),
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: const BorderSide(color: Colors.grey, width: 1.0),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                        borderSide: const BorderSide(color: Colors.grey, width: 1.0),
-                      ),
+                      style: const TextStyle(fontSize: 14, color: Colors.black),
+                      value: selectedForApprovalId,
+
+                      // ✅ Filter out the logged-in user from the list
+                      items: assignForApprovalItems
+                          .where((item) => item.value != userModel?.items[0].id) // Exclude logged-in user
+                          .toList(),
+
+                      onChanged: (widget.isEdit)
+                          ? (value) async {
+                        setState(() {
+                          selectedForApprovalId = value!;
+
+                          // ✅ Ensure userModel is not null before accessing items
+                          if (userModel != null && userModel!.items.isNotEmpty) {
+                            final selectedUser = userModel!.items.firstWhere(
+                                  (user) => user.id == selectedForApprovalId,
+                              orElse: () => Item(
+                                id: -1,
+                                name: "Unknown",
+                                email: "No Email",
+                                disable: false, // Required field
+                              ),
+                            );
+
+                            // ✅ Store the name and email safely
+                            selectedForApprovalName = selectedUser.name ?? "No Name";
+                            selectedForApprovalEmail = selectedUser.email ?? "No Email";
+                          } else {
+                            // ✅ Handle case where userModel is null
+                            selectedForApprovalName = "No Name";
+                            selectedForApprovalEmail = "No Email";
+                          }
+
+                          if (kDebugMode) {
+                            print("Selected User: $selectedForApprovalId");
+                            print("Selected Email: $selectedForApprovalEmail");
+                            print("Selected ID: $selectedForApprovalName");
+                          }
+                        });
+                        await sendPatchData();
+                      }
+                          : null, // Disable dropdown interaction when editing
                     ),
-                    style: const TextStyle(fontSize: 14, color: Colors.black),
-                    value: selectedForApprovalId,
-
-                    // ✅ Filter out the logged-in user from the list
-                    items: assignForApprovalItems
-                        .where((item) => item.value != userModel?.items[0].id) // Exclude logged-in user
-                        .toList(),
-
-                    onChanged: (widget.isEdit)
-                        ? (value) async {
-                      setState(() {
-                        selectedForApprovalId = value!;
-
-                        // ✅ Find the selected user from dropdown items
-                        final selectedItem = assignForApprovalItems.firstWhere(
-                              (item) => item.value == selectedForApprovalId,
-                          orElse: () => const DropdownMenuItem<int>(
-                            value: -1,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text("Unknown", style: TextStyle(fontSize: 14)),
-                                Text("No Email", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                              ],
-                            ),
-                          ),
-                        );
-
-                        // ✅ Extract Name & Email (Ensure child is a Row)
-                        if (selectedItem.child is Row) {
-                          final rowChildren = (selectedItem.child as Row).children;
-
-                          // Extract Name
-                          if (rowChildren.isNotEmpty && rowChildren[0] is Text) {
-                            print("Row Name: ${(rowChildren[0] as Text).data}");
-                            selectedForApprovalName = (rowChildren[0] as Text).data ?? "No Name";
-                          }
-
-                          // Extract Email (Check if at least two children exist)
-                          if (rowChildren.length > 1 && rowChildren[2] is Text) {
-                            selectedForApprovalEmail = (rowChildren[2] as Text).data ?? "No Email";
-                          }
-                        }
-
-                        if (kDebugMode) {
-                          print("Selected ForApproval ID: $selectedForApprovalId");
-                          print("Selected ForApproval Name: $selectedForApprovalName");
-                          print("Selected ForApproval Email: $selectedForApprovalEmail");
-                        }
-                      });
-                      await sendPatchData();
-                    }
-                        : null, // Disable dropdown interaction when editing
-
-
                   ),
                 ),
 
@@ -913,6 +949,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                       height: 45,
                       child: DropdownButtonFormField<int>(
                         decoration: InputDecoration(
+                          labelStyle: const TextStyle(fontSize: 14, color: Colors.black),
                           contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Reduced padding
                           filled: widget.isEdit ? isEnabled! : isEnabled,
                           fillColor:
@@ -974,92 +1011,59 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                       height: 45,
                       child: DropdownButtonFormField<int>(
                         decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Reduced padding
+                          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                          labelStyle: const TextStyle(fontSize: 14, color: Colors.black),
                           filled: widget.isEdit ? isEnabled! : isEnabled,
-                          // When disabled, apply a gray background
-                          fillColor:
-                              widget.isEdit ? Colors.grey.shade200 : Colors.white,
-                          // Light gray background when disabled
+                          fillColor: widget.isEdit ? Colors.grey.shade200 : Colors.white,
                           labelText: widget.isEdit
                               ? _challanDetail?.inChargeName
                               : "Quality In Charge *",
                           border: OutlineInputBorder(
-                            // Default border
                             borderRadius: BorderRadius.circular(8.0),
-                            borderSide:
-                                const BorderSide(color: Colors.grey, width: 1.0),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            // Unfocused border
-                            borderRadius: BorderRadius.circular(8.0),
-                            borderSide:
-                                const BorderSide(color: Colors.grey, width: 1.0),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            // Focused border
-                            borderRadius: BorderRadius.circular(8.0),
-                            borderSide:
-                                const BorderSide(color: Colors.grey, width: 1.0),
+                            borderSide: const BorderSide(color: Colors.grey, width: 1.0),
                           ),
                         ),
                         style: const TextStyle(fontSize: 14, color: Colors.black),
-                        // Smaller text size
                         value: selectedQuantityInChargeId,
                         items: quantityInChargeItems,
                         onChanged: (!widget.isEdit && isEnabled == true)
                             ? (value) {
-                                setState(() {
-                                  selectedQuantityInChargeId = value!;
-                                  // ✅ Find the selected user from dropdown items
-                                  final selectedItem = quantityInChargeItems.firstWhere(
-                                        (item) => item.value == selectedQuantityInChargeId,
-                                    orElse: () => const DropdownMenuItem<int>(
-                                      value: -1,
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text("Unknown", style: TextStyle(fontSize: 14)),
-                                          Text("No Email", style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                        ],
-                                      ),
-                                    ),
-                                  );
+                          setState(() {
+                            selectedQuantityInChargeId = value!;
 
-                                  // ✅ Extract Name & Email (Ensure child is a Row)
-                                  if (selectedItem.child is Row) {
-                                    final rowChildren = (selectedItem.child as Row).children;
+                            // ✅ Ensure userModel is not null before accessing items
+                            if (userModel != null && userModel!.items.isNotEmpty) {
+                              final selectedUser = userModel!.items.firstWhere(
+                                    (user) => user.id == selectedQuantityInChargeId,
+                                orElse: () => Item(
+                                  id: -1,
+                                  name: "Unknown",
+                                  email: "No Email",
+                                  disable: false, // Required field
+                                ),
+                              );
 
-                                    // Extract Name
-                                    if (rowChildren.isNotEmpty && rowChildren[0] is Text) {
-                                      print("Row Name: ${(rowChildren[0] as Text).data}");
-                                      selectedQualityInChargeName = (rowChildren[0] as Text).data ?? "No Name";
-                                    }
+                              // ✅ Store the name and email safely
+                              selectedQualityInChargeName = selectedUser.name ?? "No Name";
+                              selectedQualityInChargeEmail = selectedUser.email ?? "No Email";
+                            } else {
+                              // ✅ Handle case where userModel is null
+                              selectedQualityInChargeName = "No Name";
+                              selectedQualityInChargeEmail = "No Email";
+                            }
 
-                                    // Extract Email (Check if at least two children exist)
-                                    if (rowChildren.length > 1 && rowChildren[2] is Text) {
-                                      selectedQualityInChargeEmail = (rowChildren[2] as Text).data ?? "No Email";
-                                    }
-                                  }
-
-                                  if (kDebugMode) {
-                                    print("Selected ForApproval ID: $selectedQuantityInChargeId");
-                                    print("Selected ForApproval Name: $selectedQualityInChargeName");
-                                    print("Selected ForApproval Email: $selectedQualityInChargeEmail");
-                                    print("Save Pressed: $savePressed");
-                                  }
-                                });
-
-                                // if (kDebugMode) {
-                                //   print(
-                                //       "Selected QualityInCharge ID: $selectedQuantityInChargeId");
-                                //   print(
-                                //       "Selected QualityInCharge Name: $selectedQualityInChargeName");
-                                // }
-                              }
-                            : null, // Disable dropdown interaction
+                            if (kDebugMode) {
+                              print("Selected User: $selectedQualityInChargeName");
+                              print("Selected Email: $selectedQualityInChargeEmail");
+                              print("Selected ID: $selectedQuantityInChargeId");
+                            }
+                          });
+                        }
+                            : null, // Disable dropdown when necessary
                       ),
                     ),
                   ),
+
                 ],
               ),
               const SizedBox(height: 10),
@@ -1119,6 +1123,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                       height: 45,
                       child: DropdownButtonFormField<int>(
                         decoration: InputDecoration(
+                          labelStyle: const TextStyle(fontSize: 14, color: Colors.black),
                           contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Reduced padding
                           filled: widget.isEdit ? isEnabled! : isEnabled,
                           // When disabled, apply a gray background
@@ -1147,6 +1152,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                 const BorderSide(color: Colors.grey, width: 1.0),
                           ),
                         ),
+                        style: const TextStyle(fontSize: 14, color: Colors.black),
                         value: selectedSupplierId,
                         items: supplierDataItems,
                         onChanged: (!widget.isEdit && isEnabled == true)
@@ -1224,8 +1230,9 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                               backgroundColor: Colors.grey),
                           onPressed: () {
                             setState(() {
-                              print(!widget.isEdit);
+                             // print(!widget.isEdit);
                               savePressed = false;
+                              Navigator.pop(context, "Your Returned Data");
                             });
                           },
                           child: const Text("Cancel",
@@ -1313,6 +1320,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                 height: 45,
                                 child: DropdownButtonFormField<int>(
                                   decoration: InputDecoration(
+                                    labelStyle: const TextStyle(fontSize: 14, color: Colors.black),
                                     contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Reduced padding
                                     filled:
                                         widget.isEdit ? isEnabled! : isEnabled,
@@ -1502,6 +1510,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                 height: 45,
                                 child: DropdownButtonFormField<int>(
                                   decoration: InputDecoration(
+                                    labelStyle: const TextStyle(fontSize: 14, color: Colors.black),
                                     contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Reduced padding
                                     filled:
                                         widget.isEdit ? isEnabled! : isEnabled,
@@ -1607,6 +1616,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                 height: 45,
                                 child: DropdownButtonFormField<int>(
                                   decoration: InputDecoration(
+                                    labelStyle: const TextStyle(fontSize: 14, color: Colors.black),
                                     contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Reduced padding
                                     filled:
                                     widget.isEdit ? isEnabled! : isEnabled,
@@ -2112,13 +2122,32 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                 }
                               },
                             ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete,
-                                color: Colors.red,
-                                size: 30,
-                              ),
-                              onPressed: () => removeRow(index),
+                            userRole == "Quality Engineer" ? const SizedBox.shrink() : Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.camera_alt,
+                                    color: Colors.blue,
+                                    size: 30,
+                                  ),
+                                  onPressed: _openCamera,
+                                ),
+                                const SizedBox(width: 10),
+                                _capturedImage != null
+                                    ? GestureDetector(
+                                  onTap: _showFullScreenImage,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.file(
+                                      File(_capturedImage!.path),
+                                      width: 35,
+                                      height: 35,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                )
+                                    : const SizedBox.shrink(),
+                              ],
                             ),
                           ],
                         )
@@ -2167,10 +2196,11 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                     style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.grey),
                     onPressed: () {
-                      setState(() {
-                        print(!widget.isEdit);
-                        Navigator.pop(context);
-                      });
+                      Navigator.pop(context);
+                      // setState(() {
+                      //   print(!widget.isEdit);
+                      //
+                      // });
                     },
                     child: const Text("Cancel",
                         style: TextStyle(color: Colors.white)),
@@ -2179,6 +2209,25 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
               ) : const SizedBox.shrink()
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class FullScreenImage extends StatelessWidget {
+  final String imagePath;
+
+  const FullScreenImage({required this.imagePath});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: GestureDetector(
+        onTap: () => Navigator.pop(context),
+        child: Center(
+          child: Image.file(File(imagePath), fit: BoxFit.contain),
         ),
       ),
     );

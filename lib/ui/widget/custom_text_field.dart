@@ -26,6 +26,7 @@ class CustomTextField extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Adjusts padding
         labelText: label,
         hintText: hintText,
+        labelStyle: const TextStyle(fontSize: 14, color: Colors.black),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
       ),
     );

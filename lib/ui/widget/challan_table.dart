@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
@@ -7,11 +8,19 @@ import '../../core/model/challan_list.dart';
 import '../screen/add_challan.dart';
 
 class ChallanTable extends StatefulWidget {
-  final List<ChallanItem?> challanItems;
+  final List<ChallanItem> challanItems;
+  final Function(int) fetchChallanData;
   final ScrollController controllScroll;
   final String userRole;
+  final int currentPage; // ✅ Track the current page number
 
-  const ChallanTable({super.key, required this.challanItems,required this.controllScroll, required this.userRole});
+  const ChallanTable({super.key,
+    required this.challanItems,
+    required this.fetchChallanData,
+    required this.controllScroll,
+    required this.userRole,
+    required this.currentPage,
+  });
 
   @override
   _ChallanTableState createState() => _ChallanTableState();
@@ -24,33 +33,17 @@ class _ChallanTableState extends State<ChallanTable> {
   bool isLoading = false;
   List<ChallanItem?> challanListData = [];
   int currentPage = 1;
-
-  Future<void> fetchChallanData(int pageNumber) async {
-    if (isLoading) return; // ✅ Prevent duplicate API calls
-
-    setState(() {
-      isLoading = true;
-    });
-
-    ChallanListModel? response = await RestFunction.fetchChallanList(
-      currentPage: pageNumber,
-      recordPerPage: 15,
-    );
-
-    if (mounted) {
-      setState(() {
-        isLoading = false;
-        if (response?.items.isNotEmpty ?? false) {
-          challanListData.addAll(response!.items);
-          currentPage++; // ✅ Increment page number only if new data is available
-        }
-      });
-    }
-  }
+  bool hasMoreData = true;
 
   @override
   void initState() {
     super.initState();
+    widget.controllScroll.addListener(() {
+      if (widget.controllScroll.position.pixels >=
+          widget.controllScroll.position.maxScrollExtent - 200) {
+        widget.fetchChallanData(widget.currentPage); // ✅ Fetch more data when scrolling near bottom
+      }
+    });
     _sortedChallanItems = List.from(widget.challanItems); // Initialize with the original data
   }
 
@@ -151,7 +144,7 @@ class _ChallanTableState extends State<ChallanTable> {
           // Table Header
           Container(
             color: Colors.red,
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
               children: [
                 tableHeader("#", "index", 1),       // Smallest flex
@@ -165,93 +158,89 @@ class _ChallanTableState extends State<ChallanTable> {
 
           // Table Rows
           Expanded(
-            child: NotificationListener<ScrollEndNotification>(
-              onNotification: (scrollEnd) {
-                if (scrollEnd.metrics.atEdge) {
-                  bool isBottom = scrollEnd.metrics.pixels == scrollEnd.metrics.maxScrollExtent;
-                  if (isBottom) {
-                    fetchChallanData(currentPage); // Load more data when reaching the bottom
-                  }
+            child: ListView.builder(
+              controller: widget.controllScroll, // ✅ Attach controller
+              itemCount: _sortedChallanItems.length + (isLoading ? 1 : 0), // +1 for the loader
+              physics: const AlwaysScrollableScrollPhysics(), // ✅ Ensures scrolling even with fewer items
+              primary: false, // ✅ Prevents conflicts if inside another scrollable widget
+              itemBuilder: (context, index) {
+
+                if (index == widget.challanItems.length) {
+                  return isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : const SizedBox();
                 }
-                return true;
-              },
-              child: ListView.builder(
-                controller: widget.controllScroll, // ✅ Attach controller
-                itemCount: _sortedChallanItems.length + 1, // +1 for the loader
-                physics: const AlwaysScrollableScrollPhysics(), // ✅ Ensures scrolling even with fewer items
-                primary: false, // ✅ Prevents conflicts if inside another scrollable widget
-                itemBuilder: (context, index) {
-                  if (index == _sortedChallanItems.length) {
-                    return isLoading ? const Center(child: CircularProgressIndicator()) : const SizedBox(); // ✅ Show loader only when loading
-                  }
 
-                  final item = _sortedChallanItems[index];
+                // if (index == _sortedChallanItems.length) {
+                //   return isLoading ? const Center(child: CircularProgressIndicator()) : const SizedBox(); // ✅ Show loader only when loading
+                // }
 
-                  return Slidable(
-                    key: ValueKey(item?.id),
-                    endActionPane: ActionPane(
-                      motion: const ScrollMotion(),
+                final item = _sortedChallanItems[index];
+
+                return Slidable(
+                  key: ValueKey(item?.id),
+                  endActionPane: ActionPane(
+                    motion: const ScrollMotion(),
+                    children: [
+                      SlidableAction(
+                        onPressed: (context) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ViewChallanScreen(challanId: item?.id ?? 0, challanData: item),
+                            ),
+                          );
+                        },
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        icon: Icons.visibility,
+                        label: 'View',
+                      ),
+                      (widget.userRole == "New Civil Head" || item?.status == 3 || item?.status == 4 || item?.status == 6) ? const SizedBox.shrink() : SlidableAction(
+                        onPressed: (context) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChallanEntryScreen(isEdit: true, challanId: item?.id ?? 0),
+                            ),
+                          );
+                        },
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        icon: Icons.edit,
+                        label: 'Edit',
+                      ) ,
+                    ],
+                  ),
+                  child: Container(
+                    margin: const EdgeInsets.only(left: 5),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        SlidableAction(
-                          onPressed: (context) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ViewChallanScreen(challanId: item?.id ?? 0, challanData: item),
-                              ),
-                            );
-                          },
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                          icon: Icons.visibility,
-                          label: 'View',
-                        ),
-                        (widget.userRole == "New Civil Head" || item?.status == 3 || item?.status == 4 || item?.status == 6) ? const SizedBox.shrink() : SlidableAction(
-                          onPressed: (context) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChallanEntryScreen(isEdit: true, challanId: item?.id ?? 0),
-                              ),
-                            );
-                          },
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          icon: Icons.edit,
-                          label: 'Edit',
-                        ) ,
+                        tableCell((index + 1).toString(), flex: 1),
+                        tableCell(
+                            item?.documentDate is DateTime
+                                ? DateFormat('dd-MM-yyyy')
+                                .format(item!.documentDate as DateTime)
+                                : (item?.documentDate is String
+                                ? DateFormat('dd-MM-yyyy').format(
+                              DateTime.tryParse(item!.documentDate.toString()) ??
+                                  DateTime(2000, 1, 1),
+                            )
+                                : "N/A"),
+                            flex: 4),
+                        tableCell(item?.trackingNo ?? "N/A", flex: 4),
+                        tableCell(item?.vechileNo ?? "N/A", flex: 4),
+                        tableCell(item?.supplierName?.toString() ?? "N/A", flex: 4),
                       ],
                     ),
-                    child: Container(
-                      margin: const EdgeInsets.only(left: 5),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          tableCell((index + 1).toString(), flex: 1),
-                          tableCell(
-                              item?.documentDate is DateTime
-                                  ? DateFormat('yyyy-MM-dd')
-                                  .format(item!.documentDate as DateTime)
-                                  : (item?.documentDate is String
-                                  ? DateFormat('yyyy-MM-dd').format(
-                                DateTime.tryParse(item!.documentDate.toString()) ??
-                                    DateTime(2000, 1, 1),
-                              )
-                                  : "N/A"),
-                              flex: 4),
-                          tableCell(item?.trackingNo ?? "N/A", flex: 4),
-                          tableCell(item?.vechileNo ?? "N/A", flex: 4),
-                          tableCell(item?.supplierName?.toString() ?? "N/A", flex: 4),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ],

@@ -19,5 +19,6 @@ class APIUrls {
   static const String fetchProjectDetail = "api/project";
   static const String fetchActivity = "api/activity";
   static const String fetchActivityDetail = "api/activity";
+  static const String fetchSearchList = "api/LevelSetup";
 
 }
