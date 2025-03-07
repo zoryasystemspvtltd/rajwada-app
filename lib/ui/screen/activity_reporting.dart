@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data' as typed;
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:rajwada_app/core/model/event_data_model.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../core/functions/functions.dart';
 import '../helper/app_colors.dart';
+import 'add_challan.dart';
 
 
 class ActivityReport extends StatefulWidget {
@@ -26,6 +30,30 @@ class _ActivityReportScreenState extends State<ActivityReport> {
   EventModel? eventItems;
   bool isLoading = false; // Loader state
   Map<DateTime, List<Map<String, dynamic>>> eventMap = {};
+  typed.Uint8List? bytes;
+  XFile? _capturedImage;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _openCamera() async {
+    // Open the device camera
+    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+    if (image != null) {
+      setState(() {
+        _capturedImage = image;
+      });
+    }
+  }
+
+  void _showFullScreenImage() {
+    if (_capturedImage == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FullScreenImage(imagePath: _capturedImage!.path),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -35,23 +63,26 @@ class _ActivityReportScreenState extends State<ActivityReport> {
 
   Map<DateTime, List<Map<String, dynamic>>> groupEventsByDate(EventModel eventModel)
   {
-
     if (eventModel.items != null) {
       for (var item in eventModel.items!) {
-        if (item.startDate != null && item.endDate != null && item.name != null) {
-          DateTime start = _normalizeDate(item.startDate!);
-          DateTime end = _normalizeDate(item.endDate!);
+        DateTime? start, end;
+        if (item.parent?.startDate != null && item.parent?.endDate != null) {
+          start = _normalizeDate(item.parent!.startDate!);
+          end = _normalizeDate(item.parent!.endDate!);
+        } else if (item.startDate != null && item.endDate != null) {
+          start = _normalizeDate(item.startDate!);
+          end = _normalizeDate(item.endDate!);
+        }
 
+        // Ensure start and end are assigned before using them
+        if (start != null && end != null) {
           for (DateTime date = start; date.isBefore(end.add(const Duration(days: 1))); date = date.add(const Duration(days: 1))) {
-            if (!eventMap.containsKey(date)) {
-              eventMap[date] = [];
-            }
-
-            eventMap[date]!.add({
+            eventMap.putIfAbsent(date, () => []).add({
               "id": item.id,
-              "name": item.name!,
-              "progressPercentage": item.progressPercentage ?? 0, // Default 0 if null
-              "actualCost": item.actualCost ?? 0, // Default 0 if null
+              "name": item.name ?? "Unknown", // Handle potential null names
+              "progressPercentage": item.progressPercentage ?? 0, // Default to 0 if null
+              "actualCost": item.actualCost ?? 0, // Default to 0 if null
+              "photoUrl": item.parent?.photoUrl,
             });
           }
         }
@@ -112,37 +143,39 @@ class _ActivityReportScreenState extends State<ActivityReport> {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           title: Text("Tasks For Date: ${date.day}-${date.month}-${date.year}",style: const TextStyle(fontSize: 16,fontWeight: FontWeight.w500),),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Align(
-                  alignment: Alignment.topLeft,
-                  child: Text(
-                    "Events on this day:",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-              ),
-              SizedBox(height: 10),
-              ...events.map((event) => GestureDetector(
-                onTap: () {
-                  showTaskUpdateDialog(context, date, event);
-                },
-                child: Container(
-                  margin: EdgeInsets.symmetric(vertical: 5),
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Center(
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Align(
+                    alignment: Alignment.topLeft,
                     child: Text(
-                      event["name"],
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      "Events on this day:",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                ),
+                SizedBox(height: 10),
+                ...events.map((event) => GestureDetector(
+                  onTap: () {
+                    showTaskUpdateDialog(context, date, event);
+                  },
+                  child: Container(
+                    margin: EdgeInsets.symmetric(vertical: 5),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Center(
+                      child: Text(
+                        event["name"],
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
                     ),
                   ),
-                ),
-              )),
-            ],
+                )),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -155,114 +188,198 @@ class _ActivityReportScreenState extends State<ActivityReport> {
     );
   }
 
-  void showTaskUpdateDialog(BuildContext context, DateTime date, Map<String, dynamic> event) {
-    TextEditingController costController = TextEditingController(text: event["actualCost"].toString());
+  void _openCameraAndShowDialog(StateSetter setStateDialog) async {
+    final XFile? pickedFile = await ImagePicker().pickImage(source: ImageSource.camera);
+    if (pickedFile != null) {
+      setState(() {
+        _capturedImage = pickedFile; // Save image
+      });
 
-    double initialProgress = 10.0 ?? 0.0; // Default to 0 if null
+      setStateDialog(() {}); // Update UI inside the dialog
+
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text("Captured Image"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    File(pickedFile.path), // Convert XFile to File
+                    width: 200,
+                    height: 200,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context); // Close preview dialog
+                  },
+                  child: const Text("OK"),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    }
+  }
+
+  void showTaskUpdateDialog(BuildContext context, DateTime date, Map<String, dynamic> task) {
+    TextEditingController costController = TextEditingController(text: task["actualCost"].toString());
+    TextEditingController manpowerController = TextEditingController(text: "0");
+    double progress = 0.0;
+    String? selectedStatus;
+
+    print("Task Detail: $task");
+
+    if (task["photoUrl"] != null &&
+        task["photoUrl"].isNotEmpty) {
+
+      String cleanBase64 = task["photoUrl"].split(',').last;
+      bytes = base64Decode(cleanBase64); // Should work fine
+    }
 
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              content: Container(
-                width: 350, // Adjust width
-                padding: EdgeInsets.all(10),
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: const Text("Task Update Form", style: TextStyle(fontWeight: FontWeight.bold)),
+          content: StatefulBuilder(
+            builder: (context, setStateDialog) {
+              return SingleChildScrollView(
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      "Task Update Form",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 10),
-
-                    Align(
-                        alignment: Alignment.topLeft,
-                        child: Text("Date: ${date.day}-${date.month}-${date.year}",
-                            style: const TextStyle(fontWeight: FontWeight.bold))
-                    ),
-                    Align(
-                        alignment: Alignment.topLeft,
-                        child: Text("Task: ${event["name"]}",
-                            style: const TextStyle(fontWeight: FontWeight.bold))
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    const Text("Cost"),
-                    TextField(
-                      controller: costController,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: "Enter cost",
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    const Text("Progress"),
                     Column(
-                      children: [
-                        LinearProgressIndicator(
-                          value: initialProgress / 100, // Normalized to 0-1 range
-                          minHeight: 8,
-                          backgroundColor: Colors.grey[300],
-                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
-                        ),
-                        const SizedBox(height: 10),
-                        Slider(
-                          value: initialProgress,
-                          min: 0,
-                          max: 100,
-                          divisions: 100,
-                          label: "${initialProgress.toInt()}%",
-                          onChanged: (newValue) {
-                            setState(() {
-                              initialProgress = newValue < 10 ? 10 : newValue; // Update progress inside setState
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context); // Close the dialog
-                          },
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
-                          child: const Text("Close", style: TextStyle(color: Colors.white)),
+                        Align(
+                            alignment: Alignment.topLeft,
+                            child: Text("Date: ${date.day}-${date.month}-${date.year}",
+                                style: const TextStyle(fontWeight: FontWeight.bold))
                         ),
-                        ElevatedButton(
-                          onPressed: () {
-                            // Handle submission
-                            print("Submitted: Cost - ${costController.text}, Progress - ${initialProgress.toInt()}%");
-                            Navigator.pop(context); // Close the dialog
-                          },
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                          child: const Text("Submit", style: TextStyle(color: Colors.white)),
+                        Align(
+                            alignment: Alignment.topLeft,
+                            child: Text("Task: ${task["name"]}", style: TextStyle(fontWeight: FontWeight.bold))
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 15),
+                    TextField(
+                      controller: costController,
+                      decoration: InputDecoration(labelText: "Cost", border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 15),
+                    TextField(
+                      controller: manpowerController,
+                      decoration: InputDecoration(labelText: "Man Power", border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 15),
+                    const Text("Task Status:", style: TextStyle(fontWeight: FontWeight.bold)),
+                    Wrap(
+                      spacing: 10,
+                      children: ["In Progress", "On Hold", "Cancelled", "Abandoned", "Curing"]
+                          .map((status) => Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Radio(
+                            value: status,
+                            groupValue: selectedStatus,
+                            onChanged: (value) {
+                              setStateDialog(() { // Update UI inside dialog
+                                selectedStatus = value.toString();
+                                if (selectedStatus == "Curing") {
+                                  _openCameraAndShowDialog(setStateDialog); // Open Camera
+                                }
+                              });
+                            },
+                          ),
+                          Text(status),
+                          if (status == "Curing" && selectedStatus == "Curing" && _capturedImage != null)
+                            GestureDetector(
+                              onTap: _showFullScreenImage,
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 8.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.file(
+                                    File(_capturedImage!.path),
+                                    width: 35,
+                                    height: 35,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox.shrink(),
+
+                        ],
+                      ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text("Progress", style: TextStyle(fontWeight: FontWeight.bold)),
+                    Slider(
+                      value: progress,
+                      onChanged: (value) {
+                        setStateDialog(() {
+                          progress = value;
+                        });
+                      },
+                      min: 0,
+                      max: 100,
+                      divisions: 10,
+                      label: "${progress.toInt()}%",
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Checkbox(value: false, onChanged: (val) {}),
+                        Text("Assign to QC"),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Text("Activity Blueprint", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    Center(
+                      child: bytes != null
+                          ? Image.memory(bytes!) // Use `!` since we checked for null
+                          : const Text("No blueprint available"),
                     ),
                   ],
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Close", style: TextStyle(color: Colors.white)),
+              style: TextButton.styleFrom(backgroundColor: Colors.grey),
+            ),
+            TextButton(
+              onPressed: () {
+                // Handle submit action here
+                Navigator.pop(context);
+              },
+              child: Text("Submit", style: TextStyle(color: Colors.white)),
+              style: TextButton.styleFrom(backgroundColor: Colors.red),
+            ),
+          ],
         );
       },
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -294,13 +411,11 @@ class _ActivityReportScreenState extends State<ActivityReport> {
               _focusedDay = focusedDay;
             });
 
-            //List<Item> events = eventMap[selectedDay] ?? [];
-
             if (_events.containsKey(_normalizeDate(selectedDay))) {
-              _showEventPopup(context, selectedDay, _events[_normalizeDate(selectedDay)]!);
+              _showEventPopup(context, selectedDay, eventMap[_normalizeDate(selectedDay)]!);
             }
           },
-          eventLoader: (day) => _events[_normalizeDate(day)] ?? [],
+          eventLoader: (day) => eventMap[_normalizeDate(day)] ?? [],
           calendarStyle: CalendarStyle(
             todayDecoration: BoxDecoration(
               color: Colors.yellow.shade200,

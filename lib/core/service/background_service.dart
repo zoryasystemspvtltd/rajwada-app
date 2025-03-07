@@ -36,7 +36,7 @@ class LoginDataModel {
 }
 
 // Function to call API and update SharedPreferences
-Future<void> fetchLoginData() async {
+Future<void> fetchRefreshToken() async {
   try {
 
     final Uri url = Uri.https(
@@ -54,9 +54,9 @@ Future<void> fetchLoginData() async {
     });
 
     var response = await http.post(
-      Uri.parse("https://65.0.190.66/api/identity/refresh"),
-      body: jsonEncode({"username": "yourUsername", "password": "yourPassword"}),
-      headers: {"Content-Type": "application/json"},
+      url,
+      body: rawBody,
+      headers: headers,
     );
 
     if (response.statusCode == 200) {
@@ -70,7 +70,7 @@ Future<void> fetchLoginData() async {
       print("❌ Login API failed: ${response.statusCode}");
     }
   } catch (e) {
-    print("⚠️ API Error: $e");
+    print("⚠️ API Error for refresh Data: $e");
   }
 }
 
@@ -93,10 +93,10 @@ Future<void> initializeService() async {
 
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) {
-  Timer.periodic(const Duration(minutes: 4), (timer) async {
+  Timer.periodic(const Duration(seconds: 40), (timer) async {
     if (service is AndroidServiceInstance) {
       if (await service.isForegroundService()) {
-        await fetchLoginData();
+        //await fetchRefreshTokenData();
       }
     }
   });
@@ -105,6 +105,6 @@ void onStart(ServiceInstance service) {
 // Required for iOS background execution
 @pragma('vm:entry-point')
 bool onIosBackground(ServiceInstance service) {
-  fetchLoginData();
+  //fetchRefreshTokenData();
   return true;
 }

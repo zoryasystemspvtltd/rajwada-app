@@ -504,7 +504,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
   }
 
   //Fetch Pre Data Sets
-  void getUserData() async {
+  Future<void> getUserData() async {
     Map<String, dynamic> data = await RestFunction.fetchQualityUsersDropdown();
 
     if (mounted && data.isNotEmpty) {
@@ -524,7 +524,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     }
   }
 
-  void getAssignForApprovalData() async {
+  Future<void> getAssignForApprovalData() async {
     Map<String, dynamic> data = await RestFunction.fetchAssignForApprovalUsersDropdown();
     if (mounted && data.isNotEmpty) {
       setState(() {
@@ -543,7 +543,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     }
   }
 
-  void getUserProjects() async {
+  Future<void> getUserProjects() async {
     List<DropdownMenuItem<int>> items =
         await RestFunction.fetchAndStoreUserProjectData();
     if (mounted) {
@@ -553,7 +553,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     }
   }
 
-  void getSupplier() async {
+  Future<void> getSupplier() async {
     List<DropdownMenuItem<int>> items =
         await RestFunction.fetchAndStoreSupplierData();
     if (mounted) {
@@ -563,7 +563,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     }
   }
 
-  void getAssets() async {
+  Future<void> getAssets() async {
     List<DropdownMenuItem<int>> items =
         await RestFunction.fetchAndStoreAssetData();
     if (mounted) {
@@ -573,7 +573,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     }
   }
 
-  void getUomData() async {
+  Future<void> getUomData() async {
     List<DropdownMenuItem<int>> items =
         await RestFunction.fetchAndStoreUOMData();
     if (mounted) {
@@ -583,7 +583,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     }
   }
 
-  void getQualityStatus() async {
+  Future<void> getQualityStatus() async {
     List<DropdownMenuItem<int>> items =
         await RestFunction.fetchAndStoreQualityStatusData();
     if (mounted) {
@@ -660,17 +660,10 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
   @override
   void initState() {
     super.initState();
-    loadUserPrivileges();
-    getUserData();
-    getAssignForApprovalData();
-    getUserProjects();
-    getSupplier();
-    getAssets();
-    getUomData();
-    getQualityStatus();
-    fetchChallanData();
-    fetchChallanDetailItem();
-    fetchChallanStatus();
+    // Ensures _loadData() runs after initState() completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
 
     if (widget.isEdit) {
       isEnabled = false;
@@ -678,6 +671,27 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     } else {
       isEnabled = true;
       showListView = false;
+    }
+  }
+
+  Future<void> _loadData() async {
+    try {
+      await Future.wait([
+        loadUserPrivileges(),
+        getUserData(),
+        getAssignForApprovalData(),
+        getUserProjects(),
+        getSupplier(),
+        getAssets(),
+        getUomData(),
+        getQualityStatus(),
+        fetchChallanData(),
+        fetchChallanDetailItem(),
+        fetchChallanStatus(),
+      ]);
+      print("✅ All data loaded successfully!");
+    } catch (e) {
+      print("⚠️ Error loading data: $e");
     }
   }
 

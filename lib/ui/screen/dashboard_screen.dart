@@ -12,6 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/functions/functions.dart';
 import '../../core/model/challan_list.dart';
 import '../../core/model/user_privilege_model.dart';
+import '../../core/service/background_service.dart';
+import '../../core/service/shared_preference.dart';
 import '../widget/challan_table.dart';
 
 
@@ -35,7 +37,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final AuthService authService = AuthService(); // Initialize AuthService
   final RestFunction restService = RestFunction();
   bool isLoading = false;
-  final LoginDataModel loginModel = LoginDataModel();
 
   ChallanListModel? challanData;
   List<ChallanItem> challanListData = [];
@@ -50,8 +51,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    fetchChallanData(currentPage);
-    loadUserPrivileges();
+
+    // Ensures _loadData() runs after initState() completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
+
+
+  }
+
+  Future<void> _loadData() async {
+    try {
+      await Future.wait([
+        checkAndRefreshToken(),
+      ]);
+      print("✅ All data loaded successfully!");
+    } catch (e) {
+      print("⚠️ Error loading data: $e");
+    }
   }
 
   @override
@@ -60,6 +77,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     print("Received data:");
     fetchChallanData(currentPage);
     loadUserPrivileges();
+  }
+
+  Future<void> checkAndRefreshToken() async {
+    int? expiryTime = await SharedPreference.getTokenExpiry();
+
+    int currentTime = DateTime.now().millisecondsSinceEpoch;
+
+    if (currentTime >= expiryTime!) {
+      print("🔄 Token expired, refreshing...");
+      await AuthService.fetchRefreshTokenData();
+      await Future.wait([
+        loadUserPrivileges(),
+        fetchChallanData(currentPage),
+      ]);
+    } else {
+      print("✅ Token still valid");
+    }
   }
 
   // Method to load user privileges from SharedPreferences
@@ -142,31 +176,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       });
     }
   }
-
-  // Future<void> fetchChallanData(int pageNumber) async {
-  //   if (isLoading) return; // ✅ Prevent duplicate API calls
-  //
-  //   setState(() {
-  //     isLoading = true;
-  //   });
-  //
-  //   ChallanListModel? response = await RestFunction.fetchChallanList(
-  //     currentPage: pageNumber,
-  //     recordPerPage: 15,
-  //   );
-  //
-  //   if (kDebugMode) {
-  //     print("Page Number: $pageNumber");
-  //   }
-  //
-  //   if (mounted) {
-  //     setState(() {
-  //       isLoading = false;
-  //       challanListData.addAll(response?.items ?? []);
-  //       currentPage++; // Increment page number
-  //     });
-  //   }
-  // }
 
   void _toggleSearch() {
     setState(() {
