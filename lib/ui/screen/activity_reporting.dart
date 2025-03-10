@@ -33,6 +33,8 @@ class _ActivityReportScreenState extends State<ActivityReport> {
   typed.Uint8List? bytes;
   XFile? _capturedImage;
   final ImagePicker _picker = ImagePicker();
+  final List<Map<String, dynamic>> _icons = [];
+
 
   Future<void> _openCamera() async {
     // Open the device camera
@@ -44,6 +46,7 @@ class _ActivityReportScreenState extends State<ActivityReport> {
     }
   }
 
+  /// MARK:- Show Image in Full Screen
   void _showFullScreenImage() {
     if (_capturedImage == null) return;
 
@@ -55,12 +58,14 @@ class _ActivityReportScreenState extends State<ActivityReport> {
     );
   }
 
+  ///MARK: - Init State
   @override
   void initState() {
     super.initState();
     fetchEvents();
   }
 
+  ///MARK:- Group Events By Date
   Map<DateTime, List<Map<String, dynamic>>> groupEventsByDate(EventModel eventModel)
   {
     if (eventModel.items != null) {
@@ -91,6 +96,7 @@ class _ActivityReportScreenState extends State<ActivityReport> {
     return eventMap;
   }
 
+  ///MARK:- Fetch Events
   void fetchEvents() async {
     print("Event Fetching");
 
@@ -154,14 +160,14 @@ class _ActivityReportScreenState extends State<ActivityReport> {
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 ...events.map((event) => GestureDetector(
                   onTap: () {
                     showTaskUpdateDialog(context, date, event);
                   },
                   child: Container(
-                    margin: EdgeInsets.symmetric(vertical: 5),
-                    padding: EdgeInsets.all(12),
+                    margin: const EdgeInsets.symmetric(vertical: 5),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.red,
                       borderRadius: BorderRadius.circular(20),
@@ -169,7 +175,7 @@ class _ActivityReportScreenState extends State<ActivityReport> {
                     child: Center(
                       child: Text(
                         event["name"],
-                        style: TextStyle(color: Colors.white, fontSize: 16),
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
                       ),
                     ),
                   ),
@@ -180,7 +186,7 @@ class _ActivityReportScreenState extends State<ActivityReport> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text("Close"),
+              child: const Text("Close"),
             ),
           ],
         );
@@ -188,6 +194,7 @@ class _ActivityReportScreenState extends State<ActivityReport> {
     );
   }
 
+  ///MARK: - Camera operation
   void _openCameraAndShowDialog(StateSetter setStateDialog) async {
     final XFile? pickedFile = await ImagePicker().pickImage(source: ImageSource.camera);
     if (pickedFile != null) {
@@ -229,6 +236,7 @@ class _ActivityReportScreenState extends State<ActivityReport> {
     }
   }
 
+  ///MARK:- Task Update Dialog
   void showTaskUpdateDialog(BuildContext context, DateTime date, Map<String, dynamic> task) {
     TextEditingController costController = TextEditingController(text: task["actualCost"].toString());
     TextEditingController manpowerController = TextEditingController(text: "0");
@@ -267,20 +275,20 @@ class _ActivityReportScreenState extends State<ActivityReport> {
                         ),
                         Align(
                             alignment: Alignment.topLeft,
-                            child: Text("Task: ${task["name"]}", style: TextStyle(fontWeight: FontWeight.bold))
+                            child: Text("Task: ${task["name"]}", style: const TextStyle(fontWeight: FontWeight.bold))
                         ),
                       ],
                     ),
                     const SizedBox(height: 15),
                     TextField(
                       controller: costController,
-                      decoration: InputDecoration(labelText: "Cost", border: OutlineInputBorder()),
+                      decoration: const InputDecoration(labelText: "Cost", border: OutlineInputBorder()),
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 15),
                     TextField(
                       controller: manpowerController,
-                      decoration: InputDecoration(labelText: "Man Power", border: OutlineInputBorder()),
+                      decoration: const InputDecoration(labelText: "Man Power", border: OutlineInputBorder()),
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 15),
@@ -345,16 +353,61 @@ class _ActivityReportScreenState extends State<ActivityReport> {
                     Row(
                       children: [
                         Checkbox(value: false, onChanged: (val) {}),
-                        Text("Assign to QC"),
+                        const Text("Assign to QC"),
                       ],
                     ),
                     const SizedBox(height: 10),
                     const Text("Activity Blueprint", style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
                     Center(
-                      child: bytes != null
-                          ? Image.memory(bytes!) // Use `!` since we checked for null
-                          : const Text("No blueprint available"),
+                      child: GestureDetector(
+                        onTapDown: (TapDownDetails details) {
+                          _showIconOptionsDialog(details.localPosition, setStateDialog); // ✅ Pass setStateDialog
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                          ),
+                          child: Stack(
+                            children: [
+                              bytes != null
+                                  ? Image.memory(bytes!)
+                                  : const Text("No blueprint available"),
+                              ..._icons.map((iconData) {
+                                Offset position = iconData['position'];
+                                String type = iconData['type'];
+                                String text = iconData['text'];
+
+                                return Positioned(
+                                  left: position.dx - 25,
+                                  top: position.dy - 25,
+                                  child: GestureDetector(
+                                    onTap: () => _handleIconTap(iconData, setStateDialog),
+                                    child: Column(
+                                      children: [
+                                        Image.asset(
+                                          type == 'camera' ? 'assets/images/c1.png' : 'assets/images/pin.png',
+                                          width: 25,
+                                          height: 25,
+                                        ),
+                                        if (text.isNotEmpty)
+                                          Container(
+                                            padding: const EdgeInsets.all(5),
+                                            color: Colors.white,
+                                            child: Text(
+                                              text,
+                                              style: const TextStyle(fontSize: 12, color: Colors.black),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -364,16 +417,174 @@ class _ActivityReportScreenState extends State<ActivityReport> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text("Close", style: TextStyle(color: Colors.white)),
               style: TextButton.styleFrom(backgroundColor: Colors.grey),
+              child: const Text("Close", style: TextStyle(color: Colors.white)),
             ),
             TextButton(
               onPressed: () {
                 // Handle submit action here
                 Navigator.pop(context);
               },
-              child: Text("Submit", style: TextStyle(color: Colors.white)),
               style: TextButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text("Submit", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  ///MARK:- Handle Taps on Existing Icons
+  void _handleIconTap(Map<String, dynamic> iconData, void Function(void Function()) setStateDialog) {
+    switch (iconData['type']) {
+      case 'camera':
+        _showCameraIconDialog(iconData, setStateDialog);
+        break;
+      case 'balloon':
+        _showBalloonIconDialog(iconData, setStateDialog);
+        break;
+    }
+  }
+
+  ///MARK:- Show Icon Dialog
+  void _showIconOptionsDialog(Offset position, void Function(void Function()) setStateDialog) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Select Icon'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera Icon'),
+                onTap: () {
+                  setState(() {
+                    _icons.add({'position': position, 'type': 'camera', 'text': ''});
+                  });
+                  setStateDialog(() {}); // ✅ Rebuild AlertDialog
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.bubble_chart),
+                title: const Text('Balloon Icon'),
+                onTap: () {
+                  setState(() {
+                    _icons.add({'position': position, 'type': 'balloon', 'text': ''});
+                  });
+                  setStateDialog(() {}); // ✅ Rebuild AlertDialog
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  ///MARK:- Show Add Text Dialog
+  void _showAddTextDialog(Map<String, dynamic> iconData, void Function(void Function()) setStateDialog) {
+    TextEditingController textController = TextEditingController(text: iconData['text']);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Add Text'),
+          content: TextField(
+            controller: textController,
+            decoration: const InputDecoration(hintText: 'Enter your text'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                setStateDialog(() { // ✅ Updates AlertDialog UI
+                  iconData['text'] = textController.text;
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  ///MARK:- Show Camera Icon Dialog
+  void _showCameraIconDialog(Map<String, dynamic> iconData, void Function(void Function()) setStateDialog) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Camera Icon'),
+          content: const Text('Do you want to update or remove this camera icon?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setStateDialog(() { // ✅ Updates AlertDialog UI
+                  _icons.remove(iconData);
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Remove'),
+            ),
+            TextButton(
+              onPressed: () {
+                _openCameraAndShowDialog(setStateDialog); // ✅ Use setStateDialog for updates
+                Navigator.pop(context);
+              },
+              child: const Text('Update'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  ///MARK:- Show Balloon Icon Dialog
+  void _showBalloonIconDialog(Map<String, dynamic> iconData, void Function(void Function()) setStateDialog) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Balloon Icon'),
+          content: const Text('Do you want to update or remove this text balloon?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setStateDialog(() { // ✅ Updates AlertDialog UI
+                  _icons.remove(iconData);
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Remove'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _showAddTextDialog(iconData, setStateDialog); // ✅ Pass setStateDialog
+              },
+              child: const Text('Update Text'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Cancel'),
             ),
           ],
         );

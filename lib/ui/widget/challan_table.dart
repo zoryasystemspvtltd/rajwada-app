@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
 import 'package:rajwada_app/ui/screen/view_challan_data.dart';
-import '../../core/functions/functions.dart';
 import '../../core/model/challan_list.dart';
 import '../screen/add_challan.dart';
 

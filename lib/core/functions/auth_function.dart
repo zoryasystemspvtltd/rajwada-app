@@ -100,7 +100,7 @@ class AuthService {
 
       if (response.statusCode == 200) {
         // Parse response into UserPrivilegeModel
-        UserPrivilegeModel userPrivileges = _parsePrivilegeJson(response.body);;
+        UserPrivilegeModel userPrivileges = _parsePrivilegeJson(response.body);
 
         // Store user privileges in SharedPreferences
         await saveUserPrivileges(response.body);

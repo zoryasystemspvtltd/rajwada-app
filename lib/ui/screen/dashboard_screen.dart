@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:rajwada_app/core/functions/auth_function.dart';
-import 'package:rajwada_app/core/model/login_data_model.dart';
 import 'package:rajwada_app/ui/helper/app_colors.dart';
 import 'package:rajwada_app/ui/helper/assets_path.dart';
 import 'package:rajwada_app/ui/screen/add_challan.dart';
@@ -12,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/functions/functions.dart';
 import '../../core/model/challan_list.dart';
 import '../../core/model/user_privilege_model.dart';
-import '../../core/service/background_service.dart';
 import '../../core/service/shared_preference.dart';
 import '../widget/challan_table.dart';
 
@@ -319,7 +317,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   children: [
                     AnimatedContainer(
-                      duration: Duration(milliseconds: 300),
+                      duration: const Duration(milliseconds: 300),
                       width: isExpanded ? 180 : 0, // Expand width on tap
                       curve: Curves.easeInOut,
                       child: isExpanded
@@ -327,8 +325,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         controller: searchController,
                         onChanged: _onSearchChanged,
                         decoration: InputDecoration(
-                          contentPadding: EdgeInsets.symmetric(vertical: 10),
-                          prefixIcon: Icon(Icons.search),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          prefixIcon: const Icon(Icons.search),
                           hintText: "Search",
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(5),
@@ -343,13 +341,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     GestureDetector(
                       onTap: _toggleSearch,
                       child: AnimatedContainer(
-                        duration: Duration(milliseconds: 300),
+                        duration: const Duration(milliseconds: 300),
                         decoration: BoxDecoration(
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(5),
                         ),
-                        padding: EdgeInsets.all(10),
-                        child: Icon(Icons.search, color: Colors.white),
+                        padding: const EdgeInsets.all(10),
+                        child: const Icon(Icons.search, color: Colors.white),
                       ),
                     ),
                   ],

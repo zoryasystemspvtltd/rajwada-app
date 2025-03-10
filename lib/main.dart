@@ -6,7 +6,6 @@ import 'package:rajwada_app/ui/screen/login_screen.dart';
 import 'package:rajwada_app/ui/screen/splash_screen.dart';
 import 'dart:io';
 
-import 'core/service/background_service.dart';
 
 class MyHttpOverrides extends HttpOverrides{
   @override

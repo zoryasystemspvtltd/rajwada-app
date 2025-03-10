@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:rajwada_app/core/model/challan_detailItem_model.dart';
 import 'package:rajwada_app/core/model/user_privilege_model.dart';
-import 'package:rajwada_app/ui/screen/dashboard_screen.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/functions/auth_function.dart';
@@ -2232,7 +2231,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
 class FullScreenImage extends StatelessWidget {
   final String imagePath;
 
-  const FullScreenImage({required this.imagePath});
+  const FullScreenImage({super.key, required this.imagePath});
 
   @override
   Widget build(BuildContext context) {
