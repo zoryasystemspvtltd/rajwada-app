@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:rajwada_app/core/model/challan_list.dart';
@@ -8,6 +9,7 @@ import '../model/asset_data_model.dart';
 import '../model/challan_detailItem_model.dart';
 import '../model/challan_detail_model.dart';
 import '../model/challan_status_model.dart';
+import '../model/event_data_model.dart';
 import '../model/project_detail_model.dart';
 import '../model/quality_status_model.dart';
 import '../model/quality_user_model.dart';
@@ -18,11 +20,10 @@ import '../service/shared_preference.dart';
 
 class RestFunction{
 
-  // Fetch quality user data
-  static Future<List<DropdownMenuItem<int>>> fetchQualityUsersDropdown() async {
+  static Future<Map<String, dynamic>> fetchAssignForApprovalUsersDropdown() async {
     try {
       String? token = await SharedPreference.getToken();
-      if (token == null) return [];
+      if (token == null) return {};
 
       final Uri url = Uri.https(APIUrls.hostUrl, APIUrls.qualityUser);
       final Map<String, String> headers = {
@@ -37,29 +38,74 @@ class RestFunction{
 
         List<DropdownMenuItem<int>> dropdownItems = userModel.items.map((user) {
           return DropdownMenuItem<int>(
-            value: user.id, // ID
-            child: Text(user.name ?? "Unknown"), // Name
+            value: user.id,
+            child: Text(user.name ?? "Unknown", style: const TextStyle(fontSize: 14)),
           );
         }).toList();
 
-        return [const DropdownMenuItem<int>(value: -1, child: Text("--Select--")), ...dropdownItems];
-
-        // Convert list of users to DropdownMenuItems
-        return userModel.items.map((user) {
-          return DropdownMenuItem<int>(
-            value: user.id,
-            child: Text(user.name ?? "Unknown"), // Display user name
-          );
-        }).toList(); // ✅ Ensure correct type
+        return {
+          "userModel": userModel,
+          "dropdownItems": [
+            const DropdownMenuItem<int>(
+              value: -1,
+              child: Text("--Select--", style: TextStyle(fontSize: 14)),
+            ),
+            ...dropdownItems
+          ]
+        };
       } else {
         print('Failed to fetch data: ${response.statusCode}');
-        return [];
+        return {};
+      }
+    } catch (e) {
+      print('Error fetching approval user data: $e');
+      return {};
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchQualityUsersDropdown() async {
+    try {
+      String? token = await SharedPreference.getToken();
+      if (token == null) return {};
+
+      final Uri url = Uri.https(APIUrls.hostUrl, APIUrls.qualityUser);
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+      final http.Response response = await http.get(url, headers: headers);
+
+      if (response.statusCode == 200) {
+        QualityUserModel userModel = qualityUserModelFromJson(response.body);
+
+        List<DropdownMenuItem<int>> dropdownItems = userModel.items.map((user) {
+          return DropdownMenuItem<int>(
+            value: user.id,
+            child: Text(user.name ?? "Unknown", style: const TextStyle(fontSize: 14)),
+          );
+        }).toList();
+
+        return {
+          "userModel": userModel,
+          "dropdownItems": [
+            const DropdownMenuItem<int>(
+              value: -1,
+              child: Text("--Select--", style: TextStyle(fontSize: 14)),
+            ),
+            ...dropdownItems
+          ]
+        };
+      } else {
+        print('Failed to fetch data: ${response.statusCode}');
+        return {};
       }
     } catch (e) {
       print('Error fetching quality user data: $e');
-      return [];
+      return {};
     }
   }
+
 
   // Fetch user project data
   static Future<List<DropdownMenuItem<int>>> fetchAndStoreUserProjectData() async {
@@ -226,7 +272,7 @@ class RestFunction{
   }
 
   // Fetch quality status data
-  Future<List<DropdownMenuItem<int>>> fetchAndStoreQualityStatusData() async {
+  static Future<List<DropdownMenuItem<int>>> fetchAndStoreQualityStatusData() async {
     try {
       String? token = await SharedPreference.getToken();
 
@@ -268,8 +314,62 @@ class RestFunction{
     }
   }
 
+  //Fetch Search List
+  static Future<ChallanListModel?> fetchSearchList(int currentPage, int recordPerPage, String keyword) async {
+    try {
+      String? token = await SharedPreference.getToken();
+
+      if (token == null || token.isEmpty) {
+        print("Error: Token is null or empty. User might not be logged in.");
+        return null;
+      }
+
+      final Uri url = Uri.https(
+        APIUrls.hostUrl,
+        APIUrls.fetchSearchList,
+      );
+
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        'apioption': jsonEncode({
+          "currentPage": currentPage.toString(),
+          "recordPerPage": recordPerPage.toString(),
+          "search": keyword
+        }),
+      };
+
+      final http.Response response = await http.get( // 🔹 Use POST instead of GET
+        url,
+        headers: headers,
+      );
+
+      if (kDebugMode) {
+        print('Response Body: ${response.statusCode}');
+        print("Page Number: ${currentPage.toString()}");
+        print("Keyword: $keyword");
+      } // 👀 Check what API returns
+
+      if (response.statusCode == 200) {
+        if (kDebugMode) {
+          print('Response Body: ${response.body}');
+          print("Page Number: ${currentPage.toString()}");
+        } // 👀 Check what API returns
+        final jsonData = json.decode(response.body);
+        ChallanListModel challanList = ChallanListModel.fromJson(jsonData);
+        return challanList;
+      } else {
+        print('Challan list fetch failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error during challan list fetch: $e');
+      return null;
+    }
+  }
+
   //Fetch Challan List
-  static Future<ChallanListModel?> fetchChallanList({int currentPage = 1, int recordPerPage = 15}) async {
+  static Future<ChallanListModel?> fetchChallanList(int currentPage, int recordPerPage) async {
     try {
       String? token = await SharedPreference.getToken();
 
@@ -281,15 +381,16 @@ class RestFunction{
       final Uri url = Uri.https(
         APIUrls.hostUrl,
         APIUrls.fetchChallanList,
-        {
-          "currentPage": currentPage.toString(),  // 👈 Adding query parameters
-          "recordPerPage": recordPerPage.toString(),
-        },
       );
+
 
       final Map<String, String> headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
+        'apioption': jsonEncode({
+          "currentPage": currentPage.toString(),
+          "recordPerPage": recordPerPage.toString(),
+        }),
       };
 
       final http.Response response = await http.get( // 🔹 Use POST instead of GET
@@ -298,7 +399,10 @@ class RestFunction{
       );
 
       if (response.statusCode == 200) {
-        print('Response Body: ${response.body}'); // 👀 Check what API returns
+        if (kDebugMode) {
+          print('Response Body: ${response.body}');
+          print("Page Number: ${currentPage.toString()}");
+        } // 👀 Check what API returns
         final jsonData = json.decode(response.body);
         ChallanListModel challanList = ChallanListModel.fromJson(jsonData);
         return challanList;
@@ -467,6 +571,44 @@ class RestFunction{
       }
     } catch (e) {
       print('Error during fetch ProjectDetail: $e');
+      return null;
+    }
+  }
+
+  // Fetch Events
+  static Future<EventModel?> fetchActivity() async {
+    try {
+      String? token = await SharedPreference.getToken();
+
+      // If token is null, return a default list instead of null
+      if (token == null) return null;
+
+      final Uri url = Uri.https(
+        APIUrls.hostUrl, // Authority (host)
+        APIUrls.fetchActivity, // Path
+      );
+
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+      final http.Response response = await http.get(
+        url,
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        // Parse response into LoginDataModel
+        final jsonData = json.decode(response.body);
+        EventModel eventData = EventModel.fromJson(jsonData);
+        return eventData; // Return detail
+      } else {
+        print('fetch Activity failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error during fetch Activity: $e');
       return null;
     }
   }

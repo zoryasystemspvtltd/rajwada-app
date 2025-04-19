@@ -52,6 +52,7 @@ class _CustomDateFieldState extends State<CustomDateField> {
       enabled: widget.isEnabled, // Enable/Disable input
       decoration: InputDecoration(
         labelText: widget.label,
+        labelStyle: const TextStyle(fontSize: 14, color: Colors.black),
         border: const OutlineInputBorder(),
         suffixIcon: IconButton(
           icon: const Icon(Icons.calendar_today),

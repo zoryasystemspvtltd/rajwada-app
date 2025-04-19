@@ -1,0 +1,2 @@
+/Users/kunalmukherjee/Documents/rajwada-app/android/app/.cxx/RelWithDebInfo/5d6m2t6v/x86/CMakeFiles/edit_cache.dir
+/Users/kunalmukherjee/Documents/rajwada-app/android/app/.cxx/RelWithDebInfo/5d6m2t6v/x86/CMakeFiles/rebuild_cache.dir

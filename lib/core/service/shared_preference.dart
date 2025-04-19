@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SharedPreference {
   static const int defaultIntValue = -999;
   static const double defaultDoubleValue = -999.00;
+  static const String _expiryKey = "token_expiry";
 
   static Future<bool> saveStringPreference(String key, String value) async {
     try {
@@ -105,6 +106,28 @@ class SharedPreference {
   static Future<String?> getToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.getString('accessToken');
+  }
+
+  static Future<void> saveRefreshToken(String token) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('refreshToken', token);
+  }
+
+  static Future<String?> getRefreshToken() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString('refreshToken');
+  }
+
+  /// Save token expiry timestamp (in milliseconds)
+  static Future<void> saveTokenExpiry(int expiryTime) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_expiryKey, expiryTime);
+  }
+
+  /// Retrieve token expiry timestamp
+  static Future<int?> getTokenExpiry() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_expiryKey);
   }
 
 }

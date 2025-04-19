@@ -43,6 +43,7 @@ class FormFieldItem extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), // Reduced padding
         labelText: label,
         labelStyle: TextStyle(
+          fontSize: 14,
           color: isEnabled ? Colors.black : Colors.black54, // Change label color when disabled
         ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),

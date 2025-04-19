@@ -6,10 +6,19 @@ import '../../core/model/challan_list.dart';
 import '../screen/add_challan.dart';
 
 class ChallanTable extends StatefulWidget {
-  final List<ChallanItem?> challanItems;
+  final List<ChallanItem> challanItems;
+  final Function(int) fetchChallanData;
   final ScrollController controllScroll;
+  final String userRole;
+  final int currentPage; // ✅ Track the current page number
 
-  const ChallanTable({super.key, required this.challanItems,required this.controllScroll});
+  const ChallanTable({super.key,
+    required this.challanItems,
+    required this.fetchChallanData,
+    required this.controllScroll,
+    required this.userRole,
+    required this.currentPage,
+  });
 
   @override
   _ChallanTableState createState() => _ChallanTableState();
@@ -19,10 +28,20 @@ class _ChallanTableState extends State<ChallanTable> {
   bool _isAscending = true;
   String _sortColumn = "documentDate";
   List<ChallanItem?> _sortedChallanItems = [];
+  bool isLoading = false;
+  List<ChallanItem?> challanListData = [];
+  int currentPage = 1;
+  bool hasMoreData = true;
 
   @override
   void initState() {
     super.initState();
+    widget.controllScroll.addListener(() {
+      if (widget.controllScroll.position.pixels >=
+          widget.controllScroll.position.maxScrollExtent - 200) {
+        widget.fetchChallanData(widget.currentPage); // ✅ Fetch more data when scrolling near bottom
+      }
+    });
     _sortedChallanItems = List.from(widget.challanItems); // Initialize with the original data
   }
 
@@ -123,7 +142,7 @@ class _ChallanTableState extends State<ChallanTable> {
           // Table Header
           Container(
             color: Colors.red,
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
               children: [
                 tableHeader("#", "index", 1),       // Smallest flex
@@ -138,20 +157,29 @@ class _ChallanTableState extends State<ChallanTable> {
           // Table Rows
           Expanded(
             child: ListView.builder(
-              controller: widget.controllScroll,
-              itemCount: _sortedChallanItems.length,
+              controller: widget.controllScroll, // ✅ Attach controller
+              itemCount: _sortedChallanItems.length + (isLoading ? 1 : 0), // +1 for the loader
+              physics: const AlwaysScrollableScrollPhysics(), // ✅ Ensures scrolling even with fewer items
+              primary: false, // ✅ Prevents conflicts if inside another scrollable widget
               itemBuilder: (context, index) {
-                if (index == _sortedChallanItems.length) {
-                  return const Center(child: CircularProgressIndicator()); // ✅ Show loader at the end
+
+                if (index == widget.challanItems.length) {
+                  return isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : const SizedBox();
                 }
-                final item = _sortedChallanItems[index]; // ✅ Access item safely
-                
+
+                // if (index == _sortedChallanItems.length) {
+                //   return isLoading ? const Center(child: CircularProgressIndicator()) : const SizedBox(); // ✅ Show loader only when loading
+                // }
+
+                final item = _sortedChallanItems[index];
+
                 return Slidable(
-                  key: ValueKey(item?.id), // Unique key for each item
+                  key: ValueKey(item?.id),
                   endActionPane: ActionPane(
-                    motion: const ScrollMotion(), // Slide animation
+                    motion: const ScrollMotion(),
                     children: [
-                      // ✅ View Button
                       SlidableAction(
                         onPressed: (context) {
                           Navigator.push(
@@ -166,8 +194,7 @@ class _ChallanTableState extends State<ChallanTable> {
                         icon: Icons.visibility,
                         label: 'View',
                       ),
-                      // ✅ Edit Button
-                      SlidableAction(
+                      (widget.userRole == "New Civil Head" || item?.status == 3 || item?.status == 4 || item?.status == 6) ? const SizedBox.shrink() : SlidableAction(
                         onPressed: (context) {
                           Navigator.push(
                             context,
@@ -180,7 +207,7 @@ class _ChallanTableState extends State<ChallanTable> {
                         foregroundColor: Colors.white,
                         icon: Icons.edit,
                         label: 'Edit',
-                      ),
+                      ) ,
                     ],
                   ),
                   child: Container(
@@ -195,20 +222,18 @@ class _ChallanTableState extends State<ChallanTable> {
                         tableCell((index + 1).toString(), flex: 1),
                         tableCell(
                             item?.documentDate is DateTime
-                                ? DateFormat('yyyy-MM-dd')
-                                    .format(item!.documentDate as DateTime)
+                                ? DateFormat('dd-MM-yyyy')
+                                .format(item!.documentDate as DateTime)
                                 : (item?.documentDate is String
-                                    ? DateFormat('yyyy-MM-dd').format(
-                                        DateTime.tryParse(item!.documentDate
-                                                .toString()) ??
-                                            DateTime(2000, 1, 1),
-                                      )
-                                    : "N/A"),
+                                ? DateFormat('dd-MM-yyyy').format(
+                              DateTime.tryParse(item!.documentDate.toString()) ??
+                                  DateTime(2000, 1, 1),
+                            )
+                                : "N/A"),
                             flex: 4),
                         tableCell(item?.trackingNo ?? "N/A", flex: 4),
                         tableCell(item?.vechileNo ?? "N/A", flex: 4),
-                        tableCell(item?.supplierName?.toString() ?? "N/A",
-                            flex: 4),
+                        tableCell(item?.supplierName?.toString() ?? "N/A", flex: 4),
                       ],
                     ),
                   ),

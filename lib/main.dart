@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:rajwada_app/ui/screen/activity_reporting.dart';
 import 'package:rajwada_app/ui/screen/add_challan.dart';
 import 'package:rajwada_app/ui/screen/dashboard_screen.dart';
 import 'package:rajwada_app/ui/screen/login_screen.dart';
 import 'package:rajwada_app/ui/screen/splash_screen.dart';
 import 'dart:io';
 
-import 'core/service/background_service.dart';
 
 class MyHttpOverrides extends HttpOverrides{
   @override
@@ -18,7 +18,7 @@ class MyHttpOverrides extends HttpOverrides{
 void main() async{
   HttpOverrides.global = MyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeService();
+ // await initializeService();
   runApp(const MyApp());
 }
 
@@ -39,6 +39,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/dashboard': (context) => const DashboardScreen(),// Replace with your home screen
         '/addChallan': (context) => const ChallanEntryScreen(isEdit: false,challanId: 0,),
+        '/activity': (context) => const ActivityReport()
       },
     );
   }

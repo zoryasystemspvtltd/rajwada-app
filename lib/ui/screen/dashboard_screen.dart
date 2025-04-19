@@ -1,12 +1,17 @@
 
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:rajwada_app/core/functions/auth_function.dart';
-import 'package:rajwada_app/core/model/login_data_model.dart';
 import 'package:rajwada_app/ui/helper/app_colors.dart';
 import 'package:rajwada_app/ui/helper/assets_path.dart';
 import 'package:rajwada_app/ui/screen/add_challan.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/functions/functions.dart';
 import '../../core/model/challan_list.dart';
+import '../../core/model/user_privilege_model.dart';
+import '../../core/service/shared_preference.dart';
 import '../widget/challan_table.dart';
 
 
@@ -30,70 +35,164 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final AuthService authService = AuthService(); // Initialize AuthService
   final RestFunction restService = RestFunction();
   bool isLoading = false;
-  final LoginDataModel loginModel = LoginDataModel();
 
   ChallanListModel? challanData;
-  List<ChallanItem?> challanListData = [];
+  List<ChallanItem> challanListData = [];
   int currentPage = 1;
   final ScrollController _scrollController = ScrollController();
   bool hasMoreData = true;
+  UserPrivilegeModel? userPrivilege;
+  String userRole = "";
+  final TextEditingController searchController = TextEditingController();
+  bool isExpanded = false;
 
   @override
   void initState() {
     super.initState();
-    fetchChallanData(currentPage);
 
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100 && !isLoading) {
-        fetchChallanData(currentPage); // ✅ Load next page when reaching bottom
-      }
+    // Ensures _loadData() runs after initState() completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
     });
+
+
   }
 
+  Future<void> _loadData() async {
+    try {
+      await Future.wait([
+        checkAndRefreshToken(),
+      ]);
+      print("✅ All data loaded successfully!");
+    } catch (e) {
+      print("⚠️ Error loading data: $e");
+    }
+  }
 
-  // Future<void> fetchChallanData(int currentPage) async {
-  //   if (isLoading || !hasMoreData) return; // Prevent duplicate calls
-  //
-  //   isLoading = true;
-  //
-  //   ChallanListModel? response = await RestFunction.fetchChallanList(
-  //     currentPage: currentPage,
-  //     recordPerPage: 15,
-  //   );
-  //
-  //   if (response != null) {
-  //     if (response.items.isNotEmpty) {
-  //       challanListData.addAll(response.items);
-  //       currentPage++; // Increment page number
-  //     } else {
-  //       hasMoreData = false; // No more data available
-  //     }
-  //   }
-  //
-  //   isLoading = false;
-  // }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    print("Received data:");
+    fetchChallanData(currentPage);
+    loadUserPrivileges();
+  }
+
+  Future<void> checkAndRefreshToken() async {
+    int? expiryTime = await SharedPreference.getTokenExpiry();
+
+    int currentTime = DateTime.now().millisecondsSinceEpoch;
+
+    if (currentTime >= expiryTime!) {
+      print("🔄 Token expired, refreshing...");
+      await AuthService.fetchRefreshTokenData();
+      await Future.wait([
+        loadUserPrivileges(),
+        fetchChallanData(currentPage),
+      ]);
+    } else {
+      print("✅ Token still valid");
+    }
+  }
+
+  // Method to load user privileges from SharedPreferences
+  Future<void> loadUserPrivileges() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? userPrivilegeJson = prefs.getString('userPrivileges');
+
+    if (userPrivilegeJson != null) {
+      Map<String, dynamic> jsonMap = jsonDecode(userPrivilegeJson);
+      userPrivilege = UserPrivilegeModel.fromJson(jsonMap);
+    }
+
+    printRoles(); // Call printRoles() after loading data
+  }
+
+  // Method to print roles
+  void printRoles() {
+    if (userPrivilege != null && userPrivilege!.roles != null) {
+      userRole = userPrivilege!.roles!.join(', ');
+      print("User Roles: $userRole");
+    } else {
+      print("No roles found.");
+    }
+  }
 
   Future<void> fetchChallanData(int pageNumber) async {
-    if (isLoading) return; // ✅ Prevent duplicate API calls
+    print("Called after pop Back");
+    if (isLoading || !hasMoreData) return; // ✅ Prevent unnecessary
 
     setState(() {
       isLoading = true;
     });
 
     ChallanListModel? response = await RestFunction.fetchChallanList(
-      currentPage: pageNumber,
-      recordPerPage: 15,
+      pageNumber,
+      15,
     );
+
+    if (kDebugMode) {
+      print("Page Number: $pageNumber");
+    }
 
     if (mounted) {
       setState(() {
-        isLoading = false;
-        challanListData.addAll(response?.items ?? []);
-        currentPage++; // Increment page number
+        isLoading = false; // ✅ Ensure this always resets
+        if (response?.items.isNotEmpty ?? false) {
+          challanListData.addAll(response!.items);
+          currentPage++; // ✅ Only increment if new data exists
+        } else {
+          hasMoreData = false; // ✅ Stop further API calls if no new data
+        }
       });
     }
   }
 
+  Future<void> fetchSearchList(int pageNumber , String keyword) async {
+    if (isLoading) return; // ✅ Prevent duplicate API calls
+
+    setState(() {
+      isLoading = true;
+    });
+
+    ChallanListModel? response = await RestFunction.fetchSearchList(
+      currentPage,
+      15,
+      keyword
+    );
+
+    if (kDebugMode) {
+      print("Page Number: $pageNumber");
+    }
+
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+        if (response?.items.isNotEmpty ?? false) {
+          challanListData.addAll(response!.items);
+          currentPage++; // ✅ Increment page number only if new data is available
+        }
+      });
+    }
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      isExpanded = !isExpanded;
+      if (!isExpanded) {
+        searchController.clear(); // Clear text when closing
+      }
+    });
+  }
+
+  void _onSearchChanged(String value) {
+    if (value.length > 3) {
+      // Implement your search logic here
+      print("Searching for: $value");
+      challanListData = [];
+      currentPage = 1;
+      fetchSearchList(currentPage, value);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -163,6 +262,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         if (menuItems[index]["title"] == "Logout") {
                           authService.logout();
                           Navigator.pushReplacementNamed(context, '/login');
+                        } else if (menuItems[index]["title"] == "Activity Reporting") {
+                          Navigator.pushNamed(context, '/activity');
+                        } else if (menuItems[index]["title"] == "Home") {
+                          Navigator.pushNamed(context, '/dashboard');
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(
@@ -185,56 +288,91 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
-                ElevatedButton(
-                  onPressed: () {
-                    // Navigate to dashboard if login is successful
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ChallanEntryScreen(isEdit: false, challanId: 0),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                  child: const Text(
-                      "Add New", style: TextStyle(color: Colors.white)),
+                Visibility(
+                  visible: userRole == "Receiver",
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChallanEntryScreen(isEdit: false, challanId: 0),
+                        ),
+                      );
+
+                      if (result != null) {
+                        print("result not Nil");
+                        fetchChallanData(1);
+                      } else {
+                        print("result Nil");
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text(
+                      "Add New",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
                 ),
                 const Spacer(),
-                // Container(
-                //   width: 200,
-                //   height: 40,
-                //   child: TextField(
-                //     controller: _searchController,
-                //     decoration: InputDecoration(
-                //       contentPadding: EdgeInsets.symmetric(vertical: 10),
-                //       prefixIcon: Icon(Icons.search),
-                //       hintText: "Search",
-                //       border: OutlineInputBorder(
-                //         borderRadius: BorderRadius.circular(5),
-                //       ),
-                //       filled: true,
-                //       fillColor: Colors.white,
-                //     ),
-                //   ),
-                // ),
-                const SizedBox(width: 10),
-                // ElevatedButton(
-                //   onPressed: () {
-                //     // Implement search logic
-                //   },
-                //   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                //   child: Text("Search", style: TextStyle(color: Colors.white)),
-                // ),
+                Row(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: isExpanded ? 180 : 0, // Expand width on tap
+                      curve: Curves.easeInOut,
+                      child: isExpanded
+                          ? TextField(
+                        controller: searchController,
+                        onChanged: _onSearchChanged,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          prefixIcon: const Icon(Icons.search),
+                          hintText: "Search",
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                      )
+                          : null, // Hide text field when collapsed
+                    ),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: _toggleSearch,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        padding: const EdgeInsets.all(10),
+                        child: const Icon(Icons.search, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
 
-          isLoading
-              ? const Center(child: CircularProgressIndicator()) // Show loader
-              : challanData != null
-              ? const Center(
-              child: Text("No data available")) // Handle null case
-              : ChallanTable(challanItems: challanListData, controllScroll: _scrollController,), // Pass API data
+          isLoading && challanListData.isEmpty
+              ? const Center(child: CircularProgressIndicator()) // ✅ Show only if loading and no data
+              : challanListData.isEmpty
+              ? const Center(child: Text("No data available")) // ✅ Show when data is empty
+              : ChallanTable(
+            challanItems: challanListData, // ✅ Pass fetched data
+            fetchChallanData: fetchChallanData, // ✅ Pass API function for pagination
+            controllScroll: _scrollController,
+            userRole: userRole,
+            currentPage: currentPage, // ✅ Pass currentPage value
+          ),
+
+          // isLoading
+          //     ? const Center(child: CircularProgressIndicator()) // ✅ Show loader while fetching
+          //     : challanListData.isEmpty
+          //     ? const Center(child: Text("No data available")) // ✅ Show this only when API returns empty data
+          //     : ChallanTable(challanItems: challanListData, controllScroll: _scrollController, userRole: userRole) // ✅ Show data when available
         ],
       ),
     );

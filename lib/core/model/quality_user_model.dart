@@ -37,21 +37,21 @@ class QualityUserModel {
 
 /// Represents an individual user item
 class Item {
-  final int id;
-  final String? firstName;
-  final String? lastName;
-  final bool disable;
-  final String? photoUrl;
-  final String? department;
-  final String? name;
-  final String? address;
-  final dynamic roles;
-  final dynamic privileges;
-  final String? phoneNumber;
-  final String? email;
-  final dynamic parentId;
-  final String? member;
-  final String? key;
+  int id;
+  String? firstName;
+  String? lastName;
+  bool disable;
+  String? photoUrl;
+  String? department;
+  String? name;
+  String? address;
+  dynamic roles;
+  dynamic privileges;
+  String? phoneNumber;
+  String? email;
+  dynamic parentId;
+  String? member;
+  String? key;
 
   Item({
     required this.id,

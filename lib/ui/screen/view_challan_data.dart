@@ -1,13 +1,20 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:rajwada_app/ui/screen/project_detail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/functions/functions.dart';
 import '../../core/model/challan_detailItem_model.dart';
 import '../../core/model/challan_status_model.dart';
+import '../../core/model/quality_status_model.dart';
+import '../../core/model/user_privilege_model.dart';
+import '../../core/service/shared_preference.dart';
 import '../helper/app_colors.dart';
 import '../widget/form_field_widget.dart';
-
+import 'package:http/http.dart' as http;
 
 class ViewChallanScreen extends StatefulWidget {
   final int challanId;
@@ -26,7 +33,37 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
   Map<int, Map<String, TextEditingController>> controllers = {};
   bool isLoading = false; // Loader state
   List<ChallanStatusModel> _statusList = [];
+  List<DropdownMenuItem<int>> qualityStatusItems = [];
+  String userRole = "";
+  String userEmail = "";
+  UserPrivilegeModel? userPrivilege;
+  final TextEditingController _remarksController = TextEditingController();
+  bool? approveTapped = false;
 
+  // Method to load user privileges from SharedPreferences
+  Future<void> loadUserPrivileges() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? userPrivilegeJson = prefs.getString('userPrivileges');
+
+    if (userPrivilegeJson != null) {
+      Map<String, dynamic> jsonMap = jsonDecode(userPrivilegeJson);
+      userPrivilege = UserPrivilegeModel.fromJson(jsonMap);
+    }
+
+    printRoles(); // Call printRoles() after loading data
+  }
+
+  // Method to print roles
+  void printRoles() {
+    if (userPrivilege != null && userPrivilege!.roles != null) {
+      userRole = userPrivilege!.roles!.join(', ');
+      userEmail = userPrivilege?.email ?? "";
+      print("User Roles: $userRole");
+      print("User Email: $userEmail");
+    } else {
+      print("No roles found.");
+    }
+  }
 
   TextEditingController getController(int index, String fieldKey) {
     if (!controllers.containsKey(index)) {
@@ -41,7 +78,19 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
     super.initState();
     fetchChallanDetailItem();
     fetchChallanStatus();
+    getQualityStatus();
+    loadUserPrivileges();
+    print(widget.challanData?.status);
+  }
 
+  void getQualityStatus() async {
+    List<DropdownMenuItem<int>> items =
+    await RestFunction.fetchAndStoreQualityStatusData();
+    if (mounted) {
+      setState(() {
+        qualityStatusItems = items;
+      });
+    }
   }
 
   Future<void> fetchChallanStatus() async{
@@ -74,6 +123,136 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
     }
   }
 
+  String getReceiverStatusLabel(String? receiverStatus) {
+    if (receiverStatus == null) return "";
+
+    // Convert receiverStatus to int
+    int? statusValue = int.tryParse(receiverStatus);
+
+    // Extract QualityStatusModel from DropdownMenuItem<int>
+    final matchedItem = qualityStatusItems
+        .map((item) => QualityStatusModel(
+      name: item.child is Text ? (item.child as Text).data : "Unknown",
+      value: item.value,
+    ))
+        .firstWhere(
+          (item) => item.value == statusValue,
+      orElse: () => QualityStatusModel(name: "Unknown", value: -1),
+    );
+
+    return matchedItem.name ?? "Unknown";
+  }
+
+
+  void _showRemarksDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Remarks"),
+          content: TextField(
+            controller: _remarksController,
+            decoration: InputDecoration(
+              hintText: "Remarks Here.....",
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+            ),
+          ),
+          actions: [
+            // Close Button
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              style: TextButton.styleFrom(backgroundColor: Colors.grey.shade600),
+              child: const Text("Close", style: TextStyle(color: Colors.white)),
+            ),
+
+            // Submit Button
+            TextButton(
+              onPressed: () async {
+                print("Submitted Remarks: ${_remarksController.text}");
+                await sendPatchData();
+                // Navigator.of(context).pop(); // Close dialog
+              },
+              style: TextButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text("Submit", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> sendPatchData() async {
+    setState(() {
+      isLoading = true; // Show loader before API call
+    });
+    String? token = await SharedPreference.getToken();
+    if (token == null) return; // Return null if token is missing
+    String apiUrl = "";
+    apiUrl = "https://65.0.190.66/api/LevelSetup/${widget.challanData?.id}";
+
+
+    // Request body
+    Map<String, String> requestBody = {
+      "id": widget.challanData?.id.toString() ?? "",
+      "status": approveTapped == true ?  "4" : "6",
+      "approvedRemarks" : _remarksController.text,
+      "approvedBy" : userEmail,
+      "approvedDate" : DateTime.now().toString(),
+      "isApproved" : approveTapped == true ? "true" : "false"
+    };
+
+    if (kDebugMode) {
+      print("Request Body: $requestBody");
+      print("Token: $token");
+    }
+
+    try {
+      final response = await http.patch(
+        Uri.parse(apiUrl),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          isLoading = false; // Hide loader after API response
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  "Head Approval Successfully",
+                  style: TextStyle(fontSize: 16, color: Colors.green, fontWeight: FontWeight.normal),
+                ),
+                duration: Duration(seconds: 2),
+              )
+          );
+        });
+
+      } else {
+        setState(() {
+          isLoading = false; // Hide loader after API response
+        });
+        if (kDebugMode) {
+          print("Failed to send data: ${response.statusCode}");
+        }
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false; // Hide loader after API response
+      });
+      if (kDebugMode) {
+        print("Error: $e");
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
@@ -95,6 +274,45 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Visibility(
+                visible: userRole == "New Civil Head" && widget.challanData?.status == 3,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red),
+                      onPressed: () async {
+                        _remarksController.text = "";
+                        approveTapped = true;
+                        setState(() {
+
+                          _showRemarksDialog();
+                        });
+                      },
+                      child: const Text("Approve",
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey),
+                      onPressed: () {
+                        _remarksController.text = "";
+                        approveTapped = false;
+                        setState(() {
+                          _showRemarksDialog();
+                        });
+                      },
+                      child: const Text("Reject",
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20,),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -147,7 +365,7 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                           style: const TextStyle(
                             fontSize: 15, // Larger font size for project name
                             fontWeight: FontWeight.w500,
-                            color: AppColor.colorPrimary, // Different color for project name
+                            color: Colors.black, // Different color for project name
                           ),
                         ),
                       ],
@@ -182,7 +400,7 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                           style: const TextStyle(
                             fontSize: 15, // Larger font size for project name
                             fontWeight: FontWeight.w500,
-                            color: AppColor.colorPrimary, // Different color for project name
+                            color: Colors.black, // Different color for project name
                           ),
                         ),
                       ],
@@ -205,7 +423,7 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                           style: const TextStyle(
                             fontSize: 15, // Larger font size for project name
                             fontWeight: FontWeight.w500,
-                            color: AppColor.colorPrimary, // Different color for project name
+                            color: Colors.black, // Different color for project name
                           ),
                         ),
                       ],
@@ -233,7 +451,7 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                           style: const TextStyle(
                             fontSize: 15, // Larger font size for project name
                             fontWeight: FontWeight.w500,
-                            color: AppColor.colorPrimary, // Different color for project name
+                            color: Colors.black, // Different color for project name
                           ),
                         ),
                       ],
@@ -252,12 +470,12 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                           ),
                         ),
                         TextSpan(
-                          text: DateFormat('yyyy-MM-dd').format(
+                          text: DateFormat('dd-MM-yyyy').format(
                               DateTime.parse(widget.challanData?.documentDate)), // Dynamic text
                           style: const TextStyle(
                             fontSize: 14, // Larger font size for project name
                             fontWeight: FontWeight.w500,
-                            color: AppColor.colorPrimary, // Different color for project name
+                            color: Colors.black, // Different color for project name
                           ),
                         ),
                       ],
@@ -285,17 +503,22 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                           style: const TextStyle(
                             fontSize: 14, // Larger font size for project name
                             fontWeight: FontWeight.w500,
-                            color: AppColor.colorPrimary, // Different color for project name
+                            color: Colors.black, // Different color for project name
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 10,),
+                ],
+              ),
+              const SizedBox(height: 10,),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   RichText(
-                    text: const TextSpan(
+                    text: TextSpan(
                       children: [
-                        TextSpan(
+                        const TextSpan(
                           text: "Remarks: ", // Static text
                           style: TextStyle(
                             fontSize: 14,
@@ -304,11 +527,11 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                           ),
                         ),
                         TextSpan(
-                          text: "", // Use status directly
-                          style: TextStyle(
+                          text: widget.challanData?.approvedRemarks ?? "", // Use status directly
+                          style: const TextStyle(
                             fontSize: 15, // Larger font size for project name
                             fontWeight: FontWeight.w500,
-                            color: AppColor.colorPrimary, // Different color for project name
+                            color: Colors.black, // Different color for project name
                           ),
                         ),
                       ],
@@ -399,9 +622,39 @@ class _ViewChallanScreenState extends State<ViewChallanScreen> {
                                 height: 45,
                                 child: FormFieldItem(
                                   index: index,
+                                  fieldKey: "qualityStatus",
+                                  isEnabled: false,
+                                  label:  getReceiverStatusLabel(_challanDetailItem!.items[index].qualityStatus),
+                                  controller: getController(index, "qualityStatus"),
+                                  onChanged: (String ) { },
+                                ),
+                              )),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: SizedBox(
+                                height: 45,
+                                child: FormFieldItem(
+                                  index: index,
+                                  fieldKey: "qualityRemarks",
+                                  isEnabled: false,
+                                  label:  _challanDetailItem!.items[index].qualityRemarks ?? "",
+                                  controller: getController(index, "qualityRemarks"),
+                                  onChanged: (String ) { },
+                                ),
+                              )),
+                        ],
+                      ),
+                      const SizedBox(height: 10,),
+                      Row(
+                        children: [
+                          Expanded(
+                              child: SizedBox(
+                                height: 45,
+                                child: FormFieldItem(
+                                  index: index,
                                   fieldKey: "receiverStatus",
                                   isEnabled: false,
-                                  label:  _challanDetailItem!.items[index].receiverStatus ?? "",
+                                  label:  getReceiverStatusLabel(_challanDetailItem!.items[index].receiverStatus),
                                   controller: getController(index, "receiverStatus"),
                                   onChanged: (String ) { },
                                 ),
