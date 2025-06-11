@@ -17,8 +17,10 @@ class APIUrls {
   static const String postChallanDetail = "api/LevelSetup";
   static const String challanStatus = "api/enum/statusType";
   static const String fetchProjectDetail = "api/project";
-  static const String fetchActivity = "api/activity";
+  static const String fetchCalenderEvents = "api/report";
   static const String fetchActivityDetail = "api/activity";
+  static const String fetchSubActivity = "api/activity";
+  static const String fetchActivityTracking = "api/activitytracking";
   static const String fetchSearchList = "api/LevelSetup";
 
 }

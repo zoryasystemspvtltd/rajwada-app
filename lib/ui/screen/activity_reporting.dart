@@ -2,13 +2,18 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data' as typed;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:rajwada_app/core/model/event_data_model.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../core/functions/functions.dart';
+import '../../core/service/shared_preference.dart';
 import '../helper/app_colors.dart';
+import 'activity_details.dart';
 import 'add_challan.dart';
 
 
@@ -27,13 +32,25 @@ class _ActivityReportScreenState extends State<ActivityReport> {
   DateTime _selectedDay = DateTime.now();
   DateTime _focusedDay = DateTime.now();
   Map<DateTime, List<Map<String, dynamic>>> _events = {};
-  EventModel? eventItems;
+  List<EventModel>? eventItems;
   bool isLoading = false; // Loader state
   Map<DateTime, List<Map<String, dynamic>>> eventMap = {};
   typed.Uint8List? bytes;
   XFile? _capturedImage;
   final ImagePicker _picker = ImagePicker();
   final List<Map<String, dynamic>> _icons = [];
+  String? costData;
+  String? manpowerData;
+  String? progressData;
+  String? taskStateData;
+  String? activityId;
+  bool? onHoldStatus;
+  bool? onCancelledStatus;
+  bool? onCuringStatus;
+  bool? onAbandonedStatus;
+  bool isUploading = false;
+  late DateTime _lastDayOfCurrentMonth = DateTime.now();
+  late DateTime _firstDayOfCurrentMonth = DateTime.now();
 
 
   Future<void> _openCamera() async {
@@ -46,76 +63,70 @@ class _ActivityReportScreenState extends State<ActivityReport> {
     }
   }
 
-  /// MARK:- Show Image in Full Screen
-  void _showFullScreenImage() {
-    if (_capturedImage == null) return;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => FullScreenImage(imagePath: _capturedImage!.path),
-      ),
-    );
-  }
 
   ///MARK: - Init State
   @override
   void initState() {
     super.initState();
-    fetchEvents();
-  }
 
-  ///MARK:- Group Events By Date
-  Map<DateTime, List<Map<String, dynamic>>> groupEventsByDate(EventModel eventModel)
-  {
-    if (eventModel.items != null) {
-      for (var item in eventModel.items!) {
-        DateTime? start, end;
-        if (item.parent?.startDate != null && item.parent?.endDate != null) {
-          start = _normalizeDate(item.parent!.startDate!);
-          end = _normalizeDate(item.parent!.endDate!);
-        } else if (item.startDate != null && item.endDate != null) {
-          start = _normalizeDate(item.startDate!);
-          end = _normalizeDate(item.endDate!);
-        }
+    DateTime now = DateTime.now();
+    _firstDayOfCurrentMonth = DateTime(now.year, now.month, 1);
+    _lastDayOfCurrentMonth = DateTime(now.year, now.month + 1, 0); // last day of current month
 
-        // Ensure start and end are assigned before using them
-        if (start != null && end != null) {
-          for (DateTime date = start; date.isBefore(end.add(const Duration(days: 1))); date = date.add(const Duration(days: 1))) {
-            eventMap.putIfAbsent(date, () => []).add({
-              "id": item.id,
-              "name": item.name ?? "Unknown", // Handle potential null names
-              "progressPercentage": item.progressPercentage ?? 0, // Default to 0 if null
-              "actualCost": item.actualCost ?? 0, // Default to 0 if null
-              "photoUrl": item.parent?.photoUrl,
-            });
-          }
-        }
-      }
+    if (kDebugMode) {
+      print(now);
+      print(_firstDayOfCurrentMonth);
+      print(_lastDayOfCurrentMonth);
     }
-    return eventMap;
+
+    String startDate = DateFormat('yyyy-MM-dd').format(_firstDayOfCurrentMonth);
+    String endDate = DateFormat('yyyy-MM-dd').format(_lastDayOfCurrentMonth);
+    fetchEvents(startDate,  endDate);
   }
+
 
   ///MARK:- Fetch Events
-  void fetchEvents() async {
+  void fetchEvents(String startDate, String endDate) async {
     print("Event Fetching");
 
     setState(() {
       isLoading = true;
     });
 
+    // Example: for May 2025
+    // String startDate = "2025-05-01";
+    // String endDate = "2025-05-31";
+
     try {
-      EventModel? data = await RestFunction.fetchActivity();
+      List<EventModel>? data = await RestFunction.fetchCalenderActivity(startDate: startDate, endDate: endDate);
 
       if (data != null) {
         if (mounted) {
+          Map<DateTime, List<Map<String, dynamic>>> tempMap = {};
+
+          for (var event in data) {
+            DateTime normalizedDate = _normalizeDate(event.date);
+
+            if (!tempMap.containsKey(normalizedDate)) {
+              tempMap[normalizedDate] = [];
+            }
+
+            for (var activity in event.activities) {
+              tempMap[normalizedDate]!.add({
+                "id": activity.id,
+                "name": activity.name.toString().split('.').last, // enum name
+                "isCuringDone": event.isCuringDone,
+              });
+            }
+
+            // ✅ Reverse the list of activities for this date
+            tempMap[normalizedDate] = tempMap[normalizedDate]!.reversed.toList();
+          }
+
           setState(() {
-            isLoading = false;
             eventItems = data;
-            _events = groupEventsByDate(eventItems!);
-            print("Event Fetched");
-            print("Event Items: ${jsonEncode(eventItems)}");
-            print("Event Map: $_events");
+            eventMap = tempMap;
+            isLoading = false;
           });
         }
       } else {
@@ -139,63 +150,8 @@ class _ActivityReportScreenState extends State<ActivityReport> {
     return DateTime(date.year, date.month, date.day);
   }
 
-  /// Shows a popup with event details
-  void _showEventPopup(BuildContext context, DateTime date, List<Map<String, dynamic>> events) {
-
-    print(events);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: Text("Tasks For Date: ${date.day}-${date.month}-${date.year}",style: const TextStyle(fontSize: 16,fontWeight: FontWeight.w500),),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Align(
-                    alignment: Alignment.topLeft,
-                    child: Text(
-                      "Events on this day:",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                ),
-                const SizedBox(height: 10),
-                ...events.map((event) => GestureDetector(
-                  onTap: () {
-                    showTaskUpdateDialog(context, date, event);
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 5),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Center(
-                      child: Text(
-                        event["name"],
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    ),
-                  ),
-                )),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Close"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   ///MARK: - Camera operation
-  void _openCameraAndShowDialog(StateSetter setStateDialog) async {
+  void _openCameraAndShowDialog(StateSetter setStateDialog, Map<String, dynamic> task) async {
     final XFile? pickedFile = await ImagePicker().pickImage(source: ImageSource.camera);
     if (pickedFile != null) {
       setState(() {
@@ -222,12 +178,23 @@ class _ActivityReportScreenState extends State<ActivityReport> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context); // Close preview dialog
-                  },
-                  child: const Text("OK"),
-                ),
+                if (isUploading)
+                  const CircularProgressIndicator()
+                else
+                  TextButton(
+                    onPressed: () async {
+                      await uploadImageData(
+                        context: context,
+                        setStateDialog: setStateDialog,
+                        taskId: task["id"].toString(),
+                        taskName: task["name"].toString(),
+                        taskStatus: task["status"].toString(),
+                        taskMember: task["member"].toString(),
+                        taskKey: task["key"].toString(),
+                      );
+                    },
+                    child: const Text("OK"),
+                  ),
               ],
             ),
           );
@@ -236,361 +203,235 @@ class _ActivityReportScreenState extends State<ActivityReport> {
     }
   }
 
-  ///MARK:- Task Update Dialog
-  void showTaskUpdateDialog(BuildContext context, DateTime date, Map<String, dynamic> task) {
-    TextEditingController costController = TextEditingController(text: task["actualCost"].toString());
-    TextEditingController manpowerController = TextEditingController(text: "0");
-    double progress = 0.0;
-    String? selectedStatus;
+  Future<void> uploadImageData({
+    required BuildContext context,
+    required StateSetter setStateDialog,
+    required String taskId,
+    required String taskName,
+    required String taskStatus,
+    required String taskMember,
+    required String taskKey,
+  }) async {
+    if (_capturedImage == null) return;
 
-    print("Task Detail: $task");
+    setState(() {
+      isLoading = true; // Show loader before API call
+    });
 
-    if (task["photoUrl"] != null &&
-        task["photoUrl"].isNotEmpty) {
+    final File imageFile = File(_capturedImage!.path);
+    final bytes = await imageFile.readAsBytes();
+    final base64Image = "data:image/jpeg;base64,${base64Encode(bytes)}";
 
-      String cleanBase64 = task["photoUrl"].split(',').last;
-      bytes = base64Decode(cleanBase64); // Should work fine
+    String? token = await SharedPreference.getToken();
+    if (token == null) return;
+
+    String apiUrl = "https://65.0.190.66/api/attachment";
+
+    Map<String, String> requestBody = {
+      "module": "activity",
+      "file": base64Image,
+      "parentId": taskId,
+    };
+
+    if (kDebugMode) {
+      print("Uploading image with body: $requestBody");
+      print("Token: $token");
+      print(activityId.toString());
+      print(taskId);
+      print(taskName);
+      print(taskStatus);
+      print(taskMember);
+      print(taskKey);
     }
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: const Text("Task Update Form", style: TextStyle(fontWeight: FontWeight.bold)),
-          content: StatefulBuilder(
-            builder: (context, setStateDialog) {
-              return SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Align(
-                            alignment: Alignment.topLeft,
-                            child: Text("Date: ${date.day}-${date.month}-${date.year}",
-                                style: const TextStyle(fontWeight: FontWeight.bold))
-                        ),
-                        Align(
-                            alignment: Alignment.topLeft,
-                            child: Text("Task: ${task["name"]}", style: const TextStyle(fontWeight: FontWeight.bold))
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-                    TextField(
-                      controller: costController,
-                      decoration: const InputDecoration(labelText: "Cost", border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 15),
-                    TextField(
-                      controller: manpowerController,
-                      decoration: const InputDecoration(labelText: "Man Power", border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 15),
-                    const Text("Task Status:", style: TextStyle(fontWeight: FontWeight.bold)),
-                    Wrap(
-                      spacing: 10,
-                      children: ["In Progress", "On Hold", "Cancelled", "Abandoned", "Curing"]
-                          .map((status) => Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Radio(
-                            value: status,
-                            groupValue: selectedStatus,
-                            onChanged: (value) {
-                              setStateDialog(() { // Update UI inside dialog
-                                selectedStatus = value.toString();
-                                if (selectedStatus == "Curing") {
-                                  _openCameraAndShowDialog(setStateDialog); // Open Camera
-                                }
-                              });
-                            },
-                          ),
-                          Text(status),
-                          if (status == "Curing" && selectedStatus == "Curing" && _capturedImage != null)
-                            GestureDetector(
-                              onTap: _showFullScreenImage,
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 8.0),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    File(_capturedImage!.path),
-                                    width: 35,
-                                    height: 35,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                            )
-                          else
-                            const SizedBox.shrink(),
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode(requestBody),
+      );
 
-                        ],
-                      ))
-                          .toList(),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text("Progress", style: TextStyle(fontWeight: FontWeight.bold)),
-                    Slider(
-                      value: progress,
-                      onChanged: (value) {
-                        setStateDialog(() {
-                          progress = value;
-                        });
-                      },
-                      min: 0,
-                      max: 100,
-                      divisions: 10,
-                      label: "${progress.toInt()}%",
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Checkbox(value: false, onChanged: (val) {}),
-                        const Text("Assign to QC"),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    const Text("Activity Blueprint", style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    Center(
-                      child: GestureDetector(
-                        onTapDown: (TapDownDetails details) {
-                          _showIconOptionsDialog(details.localPosition, setStateDialog); // ✅ Pass setStateDialog
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey),
-                          ),
-                          child: Stack(
-                            children: [
-                              bytes != null
-                                  ? Image.memory(bytes!)
-                                  : const Text("No blueprint available"),
-                              ..._icons.map((iconData) {
-                                Offset position = iconData['position'];
-                                String type = iconData['type'];
-                                String text = iconData['text'];
+      if (response.statusCode == 200) {
+        setState(() {
+          isLoading = false; // Only state change goes here
+        });
+        if (kDebugMode) print("Image uploaded successfully.");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Image uploaded successfully.", style: TextStyle(fontSize: 16, color: Colors.green)),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        Navigator.pop(context);
+      } else {
+        setState(() {
+          isLoading = false; // Only state change goes here
+        });
+        if (kDebugMode) print("Image upload failed: ${response.statusCode}");
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false; // Only state change goes here
+      });
+      if (kDebugMode) print("Image upload error: $e");
+    } finally {
+      setStateDialog(() => isUploading = false); // Hide loader
+    }
+  }
 
-                                return Positioned(
-                                  left: position.dx - 25,
-                                  top: position.dy - 25,
-                                  child: GestureDetector(
-                                    onTap: () => _handleIconTap(iconData, setStateDialog),
-                                    child: Column(
-                                      children: [
-                                        Image.asset(
-                                          type == 'camera' ? 'assets/images/c1.png' : 'assets/images/pin.png',
-                                          width: 25,
-                                          height: 25,
-                                        ),
-                                        if (text.isNotEmpty)
-                                          Container(
-                                            padding: const EdgeInsets.all(5),
-                                            color: Colors.white,
-                                            child: Text(
-                                              text,
-                                              style: const TextStyle(fontSize: 12, color: Colors.black),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+
+  Future<void> sendFullDataToAPI(taskId, taskName, taskStatus, taskMember, taskKey) async {
+    setState(() {
+      isLoading = true; // Show loader before API call
+    });
+    String? token = await SharedPreference.getToken();
+    if (token == null) return; // Return null if token is missing
+
+    String apiUrl = "https://65.0.190.66/api/activityTracking";
+
+    // Request body
+    Map<String, String> requestBody = {
+      "manPower": manpowerData.toString(),
+      "isOnHold": onHoldStatus.toString(),
+      "isCancelled": onCancelledStatus.toString(),
+      "isCuringDone": onCuringStatus.toString(),
+      "cost": costData.toString(),
+      // "Item": "string",
+      "activityId": activityId.toString(),
+      "activity": taskStateData.toString(),
+      "id": taskId,
+      "name": taskName,
+      "status": taskStatus,
+      "date": DateTime.now().toIso8601String(),
+      "member": taskMember,
+      "key": taskKey
+    };
+
+    if (kDebugMode) {
+      print("Request Body: $requestBody");
+      print("Token: $token");
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          isLoading = false; // Only state change goes here
+        });
+
+        await sendPatchData(taskId, taskName, taskStatus, taskMember, taskKey); // Async call happens *after* setState
+      } else {
+        setState(() {
+          isLoading = false; // Hide loader after API response
+        });
+        if (kDebugMode) {
+          print("Failed to send data: ${response.statusCode}");
+        }
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false; // Hide loader after API response
+      });
+      if (kDebugMode) {
+        print("Error: $e");
+      }
+    }
+  }
+
+  Future<void> sendPatchData(taskId, taskName, taskStatus, taskMember, taskKey) async {
+    setState(() {
+      isLoading = true; // Show loader before API call
+    });
+    String? token = await SharedPreference.getToken();
+    if (token == null) return; // Return null if token is missing
+    String apiUrl = "";
+
+    apiUrl = "https://65.0.190.66//api/activity/$activityId";
+
+
+
+    // Request body
+    Map<String, String> requestBody = {
+      "actualCost": costData.toString(),
+      "isOnHold": onHoldStatus.toString(),
+      "isCancelled": onCancelledStatus.toString(),
+      "isAbandoned": onAbandonedStatus.toString(),
+      "progressPercentage": progressData.toString(),
+      "id": taskId,
+      "name": taskName,
+      "status": taskStatus,
+      "date": DateTime.now().toIso8601String(),
+      "member": taskMember,
+      "key": taskKey
+    };
+
+    if (kDebugMode) {
+      print("Request Body: $requestBody");
+      print("Token: $token");
+    }
+
+    try {
+      final response = await http.put(
+        Uri.parse(apiUrl),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          isLoading = false; // Hide loader after API response
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  "Activity Modified Successfully",
+                  style: TextStyle(fontSize: 16, color: Colors.green, fontWeight: FontWeight.normal),
                 ),
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(backgroundColor: Colors.grey),
-              child: const Text("Close", style: TextStyle(color: Colors.white)),
-            ),
-            TextButton(
-              onPressed: () {
-                // Handle submit action here
-                Navigator.pop(context);
-              },
-              style: TextButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text("Submit", style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-  }
+                duration: Duration(seconds: 2),
+              )
+          );
+        });
 
-  ///MARK:- Handle Taps on Existing Icons
-  void _handleIconTap(Map<String, dynamic> iconData, void Function(void Function()) setStateDialog) {
-    switch (iconData['type']) {
-      case 'camera':
-        _showCameraIconDialog(iconData, setStateDialog);
-        break;
-      case 'balloon':
-        _showBalloonIconDialog(iconData, setStateDialog);
-        break;
+        // if (kDebugMode) {
+        //   print("API Response Value: $response");
+        // }
+      } else {
+        setState(() {
+          isLoading = false; // Hide loader after API response
+        });
+        if (kDebugMode) {
+          print("Failed to send data: ${response.statusCode}");
+        }
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false; // Hide loader after API response
+      });
+      if (kDebugMode) {
+        print("Error: $e");
+      }
     }
   }
 
-  ///MARK:- Show Icon Dialog
-  void _showIconOptionsDialog(Offset position, void Function(void Function()) setStateDialog) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Select Icon'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('Camera Icon'),
-                onTap: () {
-                  setState(() {
-                    _icons.add({'position': position, 'type': 'camera', 'text': ''});
-                  });
-                  setStateDialog(() {}); // ✅ Rebuild AlertDialog
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.bubble_chart),
-                title: const Text('Balloon Icon'),
-                onTap: () {
-                  setState(() {
-                    _icons.add({'position': position, 'type': 'balloon', 'text': ''});
-                  });
-                  setStateDialog(() {}); // ✅ Rebuild AlertDialog
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
-  ///MARK:- Show Add Text Dialog
-  void _showAddTextDialog(Map<String, dynamic> iconData, void Function(void Function()) setStateDialog) {
-    TextEditingController textController = TextEditingController(text: iconData['text']);
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Add Text'),
-          content: TextField(
-            controller: textController,
-            decoration: const InputDecoration(hintText: 'Enter your text'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                setStateDialog(() { // ✅ Updates AlertDialog UI
-                  iconData['text'] = textController.text;
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  ///MARK:- Show Camera Icon Dialog
-  void _showCameraIconDialog(Map<String, dynamic> iconData, void Function(void Function()) setStateDialog) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Camera Icon'),
-          content: const Text('Do you want to update or remove this camera icon?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                setStateDialog(() { // ✅ Updates AlertDialog UI
-                  _icons.remove(iconData);
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('Remove'),
-            ),
-            TextButton(
-              onPressed: () {
-                _openCameraAndShowDialog(setStateDialog); // ✅ Use setStateDialog for updates
-                Navigator.pop(context);
-              },
-              child: const Text('Update'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  ///MARK:- Show Balloon Icon Dialog
-  void _showBalloonIconDialog(Map<String, dynamic> iconData, void Function(void Function()) setStateDialog) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Balloon Icon'),
-          content: const Text('Do you want to update or remove this text balloon?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                setStateDialog(() { // ✅ Updates AlertDialog UI
-                  _icons.remove(iconData);
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('Remove'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _showAddTextDialog(iconData, setStateDialog); // ✅ Pass setStateDialog
-              },
-              child: const Text('Update Text'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -611,8 +452,8 @@ class _ActivityReportScreenState extends State<ActivityReport> {
         child: isLoading ?
         const Center(child: CircularProgressIndicator()) :
         TableCalendar(
-          firstDay: DateTime.utc(2020, 1, 1),
-          lastDay: DateTime.utc(2030, 12, 31),
+          firstDay: DateTime(2025, 1, 1),
+          lastDay: DateTime(2040, 12, 31),
           focusedDay: _focusedDay,
           calendarFormat: _calendarFormat,
           selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
@@ -621,10 +462,28 @@ class _ActivityReportScreenState extends State<ActivityReport> {
               _selectedDay = selectedDay;
               _focusedDay = focusedDay;
             });
+          },
+          onPageChanged: (focusedDay) {
 
-            if (_events.containsKey(_normalizeDate(selectedDay))) {
-              _showEventPopup(context, selectedDay, eventMap[_normalizeDate(selectedDay)]!);
+            setState(() {
+              _focusedDay = focusedDay; // <-- this is essential
+            });
+
+            // Fetch new events for the new visible month
+            print(focusedDay);
+            DateTime firstDay = DateTime(focusedDay.year, focusedDay.month, 1);
+            DateTime lastDay = DateTime(focusedDay.year, focusedDay.month + 1, 0); // last day of current month
+
+            if (kDebugMode) {
+              print(focusedDay);
+              print(firstDay);
+              print(lastDay);
             }
+
+            String startDate = DateFormat('yyyy-MM-dd').format(firstDay);
+            String endDate = DateFormat('yyyy-MM-dd').format(lastDay);
+            fetchEvents(startDate,  endDate);
+            //fetchEvents(focusedDay);
           },
           eventLoader: (day) => eventMap[_normalizeDate(day)] ?? [],
           calendarStyle: CalendarStyle(
@@ -640,36 +499,90 @@ class _ActivityReportScreenState extends State<ActivityReport> {
           headerStyle: const HeaderStyle(
             formatButtonVisible: false,
             titleCentered: true,
+            leftChevronVisible: true,
+            rightChevronVisible: true, // hides the next month arrow
           ),
           calendarBuilders: CalendarBuilders(
             markerBuilder: (context, date, events) {
-              if (events.isNotEmpty) {
+                if (events.isEmpty) return null;
+
+                bool showCuring = false;
+
+                // Check if any event on that date has isCuringDone == true
+                for (Map<String, dynamic> event in events.cast<Map<String, dynamic>>()) {
+                  if (event['isCuringDone'] == true) {
+                    showCuring = true;
+                    break;
+                  }
+                }
+
                 return GestureDetector(
-                  onTap: () => _showEventPopup(context, date, events.cast<Map<String, dynamic>>()),
-                  child: Align( // Use Align instead of Positioned
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      width: 22,
-                      height: 22,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          events.length.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                  onTap: () {
+                      // Allow navigation only if it's today's date
+                      print('Tapped date: $date');
+                      print('Number of events: ${events.length}');
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ActivityDetailsPage(
+                            selectedDate: date,
+                            events: events.cast<Map<String, dynamic>>(),
                           ),
                         ),
-                      ),
+                      );
+                  },//_showEventPopup(context, date, events.cast<Map<String, dynamic>>()),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Red count circle
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              events.length.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 4), // space between count and badge
+
+                        // Green "C" badge for curing
+                        if (showCuring)
+                          Container(
+                            width: 20,
+                            height: 20,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'C',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 );
-              }
-              return null;
             },
           ),
         ),

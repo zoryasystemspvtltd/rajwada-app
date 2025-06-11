@@ -1,234 +1,83 @@
 import 'dart:convert';
 
-EventModel eventModelFromJson(String str) => EventModel.fromJson(json.decode(str));
+List<EventModel> eventModelFromJson(String str) => List<EventModel>.from(json.decode(str).map((x) => EventModel.fromJson(x)));
 
-String eventModelToJson(EventModel data) => json.encode(data.toJson());
+String eventModelToJson(List<EventModel> data) => json.encode(List<dynamic>.from(data.map((x) => x.toJson())));
 
 class EventModel {
-  int? totalRecords;
-  List<Item>? items;
+  final DateTime date;
+  final bool isCuringDone;
+  final List<Activity> activities;
 
   EventModel({
-    this.totalRecords,
-    this.items,
+    required this.date,
+    required this.isCuringDone,
+    required this.activities,
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) => EventModel(
-    totalRecords: json["totalRecords"],
-    items: json["items"] == null ? [] : List<Item>.from(json["items"]!.map((x) => Item.fromJson(x))),
+    date: DateTime.parse(json["date"]),
+    isCuringDone: json["isCuringDone"] ?? false, // <-- Fix here
+    activities: List<Activity>.from(
+      (json["activities"] ?? []).map((x) => Activity.fromJson(x)),
+    ),
   );
 
   Map<String, dynamic> toJson() => {
-    "totalRecords": totalRecords,
-    "items": items == null ? [] : List<dynamic>.from(items!.map((x) => x.toJson())),
+    "date": "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}",
+    "isCuringDone": isCuringDone,
+    "activities": List<dynamic>.from(activities.map((x) => x.toJson())),
   };
 }
 
-class Item {
-  String? description;
-  Type? type;
-  String? photoUrl;
-  dynamic documentLinks;
-  dynamic notes;
-  dynamic userId;
-  dynamic priorityStatus;
-  WorkflowState? workflowState;
-  dynamic approvalStatus;
-  double? costEstimate;
-  double? actualCost;
-  DateTime? startDate;
-  DateTime? endDate;
-  dynamic actualStartDate;
-  dynamic actualEndDate;
-  int? duration;
-  int? progressPercentage;
-  String? items;
-  int? projectId;
-  dynamic project;
-  int? parentId;
-  Item? parent;
-  String? parentName;
-  int? dependencyId;
-  dynamic dependency;
-  int? towerId;
-  dynamic tower;
-  int? floorId;
-  dynamic floor;
-  int? flatId;
-  dynamic flat;
-  dynamic contractorId;
-  dynamic contractor;
-  int? id;
-  String? name;
-  int? status;
-  DateTime? date;
-  String? member;
-  String? key;
+class Activity {
+  final int id;
+  final Name name;
 
-  Item({
-    this.description,
-    this.type,
-    this.photoUrl,
-    this.documentLinks,
-    this.notes,
-    this.userId,
-    this.priorityStatus,
-    this.workflowState,
-    this.approvalStatus,
-    this.costEstimate,
-    this.actualCost,
-    this.startDate,
-    this.endDate,
-    this.actualStartDate,
-    this.actualEndDate,
-    this.duration,
-    this.progressPercentage,
-    this.items,
-    this.projectId,
-    this.project,
-    this.parentId,
-    this.parent,
-    this.parentName,
-    this.dependencyId,
-    this.dependency,
-    this.towerId,
-    this.tower,
-    this.floorId,
-    this.floor,
-    this.flatId,
-    this.flat,
-    this.contractorId,
-    this.contractor,
-    this.id,
-    this.name,
-    this.status,
-    this.date,
-    this.member,
-    this.key,
+  Activity({
+    required this.id,
+    required this.name,
   });
 
-  @override
-  String toString() {
-    return 'Item{name: $name, date: $date}';
-  }
-
-  factory Item.fromJson(Map<String, dynamic> json) => Item(
-    description: json["description"] ?? "",  // Provide a default empty string
-    type: typeValues.map[json["type"]],  // Remove `!` to prevent crash on null
-    photoUrl: json["photoUrl"],
-    documentLinks: json["documentLinks"],
-    notes: json["notes"],
-    userId: json["userId"],
-    priorityStatus: json["priorityStatus"],
-    workflowState: json["workflowState"] != null ? workflowStateValues.map[json["workflowState"]] : null, // Safe null check
-    approvalStatus: json["approvalStatus"],
-    costEstimate: json["costEstimate"]?.toDouble() ?? 0.0, // Ensure it's a double to avoid type errors
-    actualCost: json["actualCost"]?.toDouble() ?? 0.0,
-    startDate: json["startDate"] != null ? DateTime.tryParse(json["startDate"]) : null,
-    endDate: json["endDate"] != null ? DateTime.tryParse(json["endDate"]) : null,
-    actualStartDate: json["actualStartDate"],
-    actualEndDate: json["actualEndDate"],
-    duration: json["duration"] ?? 0,
-    progressPercentage: json["progressPercentage"] ?? 0,
-    items: json["items"] ?? "[]", // Default to empty JSON array if null
-    projectId: json["projectId"],
-    project: json["project"],
-    parentId: json["parentId"],
-    parent: json["parent"] != null ? Item.fromJson(json["parent"]) : null,
-    parentName: json["parentName"] ?? "",
-    dependencyId: json["dependencyId"],
-    dependency: json["dependency"],
-    towerId: json["towerId"],
-    tower: json["tower"],
-    floorId: json["floorId"],
-    floor: json["floor"],
-    flatId: json["flatId"],
-    flat: json["flat"],
-    contractorId: json["contractorId"],
-    contractor: json["contractor"],
+  factory Activity.fromJson(Map<String, dynamic> json) => Activity(
     id: json["id"],
-    name: json["name"] ?? "Unknown", // Provide a fallback name
-    status: json["status"] ?? 0,
-    date: json["date"] != null ? DateTime.tryParse(json["date"]) : null,
-    member: json["member"], // No force unwrap
-    key: json["key"], // No force unwrap
+    name: nameValues.map[json["name"]]!,
   );
 
   Map<String, dynamic> toJson() => {
-    "description": description,
-    "type": typeValues.reverse[type],
-    "photoUrl": photoUrl,
-    "documentLinks": documentLinks,
-    "notes": notes,
-    "userId": userId,
-    "priorityStatus": priorityStatus,
-    "workflowState": workflowStateValues.reverse[workflowState],
-    "approvalStatus": approvalStatus,
-    "costEstimate": costEstimate,
-    "actualCost": actualCost,
-    "startDate": startDate?.toIso8601String(),
-    "endDate": endDate?.toIso8601String(),
-    "actualStartDate": actualStartDate,
-    "actualEndDate": actualEndDate,
-    "duration": duration,
-    "progressPercentage": progressPercentage,
-    "items": items,
-    "projectId": projectId,
-    "project": project,
-    "parentId": parentId,
-    "parent": parent?.toJson(),
-    "parentName": parentName,
-    "dependencyId": dependencyId,
-    "dependency": dependency,
-    "towerId": towerId,
-    "tower": tower,
-    "floorId": floorId,
-    "floor": floor,
-    "flatId": flatId,
-    "flat": flat,
-    "contractorId": contractorId,
-    "contractor": contractor,
     "id": id,
-    "name": name,
-    "status": status,
-    "date": date?.toIso8601String(),
-    "member": memberValues.reverse[member],
-    "key": keyValues.reverse[key],
+    "name": nameValues.reverse[name],
   };
 }
 
-enum Key {
-  THE_1536_B022_C5_C9_4358_BB6_A_466_F2075_B7_D4
+enum Name {
+  BRICK_WORK_D_F1_1,
+  BRICK_WORK_PROJECT_1_B_F1_1,
+  CEMENT_WORK_D_F1_1,
+  HACKING_D_F1_1,
+  HACKING_F_F1_1,
+  HACKING_PROJECT_1_B_F1_1,
+  HACKING_PROJECT_2_C_F1_1,
+  PAINTING_F_F1_1,
+  PAINTING_OUTSIDE_TOWER_E_FLOOR_1_FLAT_1,
+  PLUMBING_WORK_TOWER_E_FLOOR_1_FLAT_1,
+  PUTTY_WORK_PROJECT_2_C_F1_1,
+  PUTTY_WORK_TOWER_E_FLOOR_1_FLAT_1
 }
 
-final keyValues = EnumValues({
-  "1536B022-C5C9-4358-BB6A-466F2075B7D4": Key.THE_1536_B022_C5_C9_4358_BB6_A_466_F2075_B7_D4
-});
-
-enum Member {
-  A_BOSE_CIVILHEAD_COM
-}
-
-final memberValues = EnumValues({
-  "a.bose@civilhead.com": Member.A_BOSE_CIVILHEAD_COM
-});
-
-enum Type {
-  MAIN_TASK,
-  SUB_TASK
-}
-
-final typeValues = EnumValues({
-  "Main Task": Type.MAIN_TASK,
-  "Sub Task": Type.SUB_TASK
-});
-
-enum WorkflowState {
-  NEW
-}
-
-final workflowStateValues = EnumValues({
-  "New": WorkflowState.NEW
+final nameValues = EnumValues({
+  "Brick Work-D-F1-1": Name.BRICK_WORK_D_F1_1,
+  "Brick Work-Project-1-B-F1-1": Name.BRICK_WORK_PROJECT_1_B_F1_1,
+  "Cement Work-D-F1-1": Name.CEMENT_WORK_D_F1_1,
+  "Hacking-D-F1-1": Name.HACKING_D_F1_1,
+  "Hacking-F-F1-1": Name.HACKING_F_F1_1,
+  "Hacking-Project-1-B-F1-1": Name.HACKING_PROJECT_1_B_F1_1,
+  "Hacking-Project-2-C-F1-1": Name.HACKING_PROJECT_2_C_F1_1,
+  "Painting-F-F1-1": Name.PAINTING_F_F1_1,
+  "Painting Outside-Tower E-Floor 1-Flat 1": Name.PAINTING_OUTSIDE_TOWER_E_FLOOR_1_FLAT_1,
+  "Plumbing Work-Tower E-Floor 1-Flat 1": Name.PLUMBING_WORK_TOWER_E_FLOOR_1_FLAT_1,
+  "PuttyWork-Project-2-C-F1-1": Name.PUTTY_WORK_PROJECT_2_C_F1_1,
+  "Putty Work-Tower E-Floor 1-Flat 1": Name.PUTTY_WORK_TOWER_E_FLOOR_1_FLAT_1
 });
 
 class EnumValues<T> {

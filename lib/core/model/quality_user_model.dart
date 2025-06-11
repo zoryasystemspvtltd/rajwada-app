@@ -11,7 +11,7 @@ String qualityUserModelToJson(QualityUserModel data) =>
 /// Quality User Model representing API response
 class QualityUserModel {
   final int totalRecords;
-  final List<Item> items;
+  final List<QualityItem> items;
 
   QualityUserModel({
     required this.totalRecords,
@@ -23,7 +23,7 @@ class QualityUserModel {
     return QualityUserModel(
       totalRecords: json["totalRecords"] ?? 0,
       items: (json["items"] as List<dynamic>?)
-          ?.map((x) => Item.fromJson(x))
+          ?.map((x) => QualityItem.fromJson(x))
           .toList() ?? [],
     );
   }
@@ -36,7 +36,7 @@ class QualityUserModel {
 }
 
 /// Represents an individual user item
-class Item {
+class QualityItem {
   int id;
   String? firstName;
   String? lastName;
@@ -53,7 +53,7 @@ class Item {
   String? member;
   String? key;
 
-  Item({
+  QualityItem({
     required this.id,
     this.firstName,
     this.lastName,
@@ -72,7 +72,7 @@ class Item {
   });
 
   /// Factory method to create `Item` from JSON
-  factory Item.fromJson(Map<String, dynamic> json) => Item(
+  factory QualityItem.fromJson(Map<String, dynamic> json) => QualityItem(
     id: json["id"] ?? 0,
     firstName: json["firstName"],
     lastName: json["lastName"],
