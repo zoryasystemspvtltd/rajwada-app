@@ -4,7 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:rajwada_app/core/model/challan_list.dart';
+import 'package:rajwada_app/core/model/comment_model.dart';
 import '../../api_url.dart';
+import '../model/activity_detail_model.dart';
+import '../model/activity_sub_detail_model.dart';
+import '../model/activity_tracking_response.dart';
 import '../model/asset_data_model.dart';
 import '../model/challan_detailItem_model.dart';
 import '../model/challan_detail_model.dart';
@@ -575,40 +579,164 @@ class RestFunction{
     }
   }
 
-  // Fetch Events
-  static Future<EventModel?> fetchActivity() async {
+  // Fetch Calender Events
+  static Future<List<EventModel>?> fetchCalenderActivity({required String startDate, required String endDate}) async {
     try {
       String? token = await SharedPreference.getToken();
-
-      // If token is null, return a default list instead of null
       if (token == null) return null;
 
-      final Uri url = Uri.https(
-        APIUrls.hostUrl, // Authority (host)
-        APIUrls.fetchActivity, // Path
-      );
+      final Uri url = Uri.parse('https://65.0.190.66/api/report/$startDate/$endDate');
 
       final Map<String, String> headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       };
 
-      final http.Response response = await http.get(
-        url,
-        headers: headers,
-      );
+      final http.Response response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
-        // Parse response into LoginDataModel
-        final jsonData = json.decode(response.body);
-        EventModel eventData = EventModel.fromJson(jsonData);
-        return eventData; // Return detail
+        return eventModelFromJson(response.body); // ✅ Using your helper function
       } else {
         print('fetch Activity failed: ${response.body}');
         return null;
       }
     } catch (e) {
       print('Error during fetch Activity: $e');
+      return null;
+    }
+  }
+
+  static Future<ActivitySubDetailModel?> fetchSubActivityList(int subActivityId) async {
+    try {
+      String? token = await SharedPreference.getToken();
+      if (token == null) return null;
+
+      final Uri url = Uri.https(
+        APIUrls.hostUrl,
+        APIUrls.fetchSubActivity,
+      );
+
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        'apioption': jsonEncode({
+          "recordPerPage": 0,
+          "searchCondition": {
+            "name": "Type",
+            "value": "Sub Task",
+            "and":{
+              "name": "parentId",
+              "value": subActivityId
+            }
+          }
+        }),
+      };
+
+      final http.Response response = await http.get(url, headers: headers);
+
+      if (response.statusCode == 200) {
+        // Parse the response as a list of ActivitySubDetailModel
+        return activitySubDetailModelFromJson(response.body);
+      } else {
+        print('fetch Activity failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error during fetch Activity: $e');
+      return null;
+    }
+  }
+
+  static Future<ActivityDetailModel?> fetchSubActivity(int subActivityId) async {
+    try {
+      String? token = await SharedPreference.getToken();
+      if (token == null) return null;
+
+      final Uri url = Uri.https(
+        APIUrls.hostUrl,
+        "${APIUrls.fetchSubActivity}/$subActivityId", // fixed path construction
+      );
+
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        'apioption': jsonEncode({
+          "recordPerPage": 0,
+          "searchCondition": {
+            "name": "activityId",
+            "value": subActivityId,
+            "and": {
+              "name": "date",
+              "value": "2025-05-23T18:30:00.000Z",
+              "operator": "greaterThan",
+              "and": {
+                "name": "date",
+                "value": "2025-05-24T18:29:59.999Z",
+                "operator": "lessThan"
+              }
+            }
+          }
+        }),
+      };
+
+      final http.Response response = await http.get(url, headers: headers);
+
+      if (response.statusCode == 200) {
+        return activityDetailModelFromJson(response.body); // fixed incorrect function used
+      } else {
+        print('fetch Activity failed: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error during fetch Activity: $e');
+      return null;
+    }
+  }
+
+  static Future<ActivityTrackingResponse?> fetchActivityTracking(int subActivityId) async {
+    try {
+      String? token = await SharedPreference.getToken();
+      if (token == null) return null;
+
+      final Uri url = Uri.https(
+        APIUrls.hostUrl,
+        APIUrls.fetchActivityTracking,
+        {
+          'apioption': jsonEncode({
+            "recordPerPage": 0,
+            "searchCondition": {
+              "name": "activityId",
+              "value": subActivityId,
+              "and": {
+                "name": "date",
+                "value": "2025-05-23T18:30:00.000Z",
+                "operator": "greaterThan",
+                "and": {
+                  "name": "date",
+                  "value": "2025-05-24T18:29:59.999Z",
+                  "operator": "lessThan"
+                }
+              }
+            }
+          }),
+        },
+      );
+
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      });
+
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return ActivityTrackingResponse.fromJson(jsonDecode(response.body));
+      } else {
+        print('Failed to fetch activity: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e, stackTrace) {
+      print('Exception: $e\n$stackTrace');
       return null;
     }
   }

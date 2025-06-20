@@ -11,6 +11,7 @@ import 'package:rajwada_app/core/model/user_privilege_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/functions/auth_function.dart';
 import '../../core/functions/functions.dart';
+import '../../core/model/activity_detail_model.dart';
 import '../../core/model/challan_detail_model.dart';
 import '../../core/model/challan_status_model.dart';
 import '../../core/model/login_data_model.dart';
@@ -122,13 +123,21 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
     }
   }
 
-  void _showFullScreenImage() {
+  void _showFullScreenImage(ActivityDetailModel activityDetails) {
     if (_capturedImage == null) return;
 
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => FullScreenImage(imagePath: _capturedImage!.path),
+        builder: (context) => FullScreenImage(
+          imagePath: _capturedImage!.path,
+          activityDetails: activityDetails,
+          onRetake: () {
+            Navigator.pop(context); // Close full-screen image view
+            //_openCameraAndShowDialog(activityDetails); // Reopen camera
+          },
+          onUpload: () {  },
+        ),
       ),
     );
   }
@@ -921,7 +930,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                           if (userModel != null && userModel!.items.isNotEmpty) {
                             final selectedUser = userModel!.items.firstWhere(
                                   (user) => user.id == selectedForApprovalId,
-                              orElse: () => Item(
+                              orElse: () => QualityItem(
                                 id: -1,
                                 name: "Unknown",
                                 email: "No Email",
@@ -1048,7 +1057,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                             if (userModel != null && userModel!.items.isNotEmpty) {
                               final selectedUser = userModel!.items.firstWhere(
                                     (user) => user.id == selectedQuantityInChargeId,
-                                orElse: () => Item(
+                                orElse: () => QualityItem(
                                   id: -1,
                                   name: "Unknown",
                                   email: "No Email",
@@ -2148,7 +2157,7 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
                                 const SizedBox(width: 10),
                                 _capturedImage != null
                                     ? GestureDetector(
-                                  onTap: _showFullScreenImage,
+                                  onTap: (){},//_showFullScreenImage,
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: Image.file(
@@ -2230,18 +2239,59 @@ class _ChallanEntryScreenState extends State<ChallanEntryScreen> {
 
 class FullScreenImage extends StatelessWidget {
   final String imagePath;
+  final ActivityDetailModel activityDetails;
+  final VoidCallback onRetake;
+  final VoidCallback onUpload;
 
-  const FullScreenImage({super.key, required this.imagePath});
+  const FullScreenImage({
+    required this.imagePath,
+    required this.activityDetails,
+    required this.onRetake,
+    required this.onUpload,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
+    bool isUploading = false;
+
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: GestureDetector(
-        onTap: () => Navigator.pop(context),
-        child: Center(
-          child: Image.file(File(imagePath), fit: BoxFit.contain),
-        ),
+      appBar: AppBar(title: const Text("Preview Image")),
+      body: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: Image.file(File(imagePath), fit: BoxFit.contain),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                return Column(
+                  children: [
+                    if (isUploading)
+                      const CircularProgressIndicator()
+                    else
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          ElevatedButton(
+                            onPressed: onUpload,
+                            child: const Text("Upload"),
+                          ),
+                          OutlinedButton(
+                            onPressed: onRetake,
+                            child: const Text("Retake"),
+                          ),
+                        ],
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
