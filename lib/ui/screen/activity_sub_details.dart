@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:http/http.dart' as http;
 import 'package:rajwada_app/core/model/activity_sub_detail_model.dart';
+import 'package:rajwada_app/ui/screen/delete_activity.dart';
 import 'package:rajwada_app/ui/screen/gallery_image.dart';
 import 'package:rajwada_app/ui/screen/post_activity_report.dart';
 import 'package:rajwada_app/ui/screen/post_comment.dart';
@@ -167,6 +168,16 @@ class _ActivitySubDetailsPageState extends State<ActivitySubDetailsPage> {
                       CustomSlidableAction(
                         onPressed: (context) {
                           print("Delete tapped for ${activityData.name}");
+                          print('id: ${activityData.id}, date: ${widget.selectedDate}');
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DeleteActivityPage(
+                                parentId: activityData.id!,
+                                selectedDate: widget.selectedDate
+                              ),
+                            ),
+                          );
                         },
                         child: Container(
                           height: 60,
