@@ -1,7 +1,10 @@
 
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:rajwada_app/ui/helper/app_colors.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/functions/auth_function.dart';
 import '../../core/model/login_data_model.dart';
@@ -60,6 +63,13 @@ class _LoginScreenState extends State<LoginScreen> {
           print(loginData.accessToken);
           print(loginData.tokenType);
         }
+
+        // Save email to SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+            'loggedInUser',
+            json.encode({"member": email}) // match your CommentModel member field
+        );
 
         // Fetch user privileges after login
         UserPrivilegeModel? privileges = await authService.fetchAndStoreUserPrivileges();

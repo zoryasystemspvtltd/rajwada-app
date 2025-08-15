@@ -46,6 +46,7 @@ class _CommentPageState extends State<CommentPage> {
   @override
   void initState() {
     super.initState();
+
     _loadLoggedInUser();
     _fetchComments();
   }
@@ -157,6 +158,7 @@ class _CommentPageState extends State<CommentPage> {
     final user = await getLoggedInUser();
     setState(() {
       loggedInUser = user;
+      print(loggedInUser);
     });
   }
 
@@ -326,17 +328,13 @@ class _CommentPageState extends State<CommentPage> {
   }
 
   Widget _buildCommentBubble(CommentModelItem comment) {
-    bool isCurrentUser = comment.member == loggedInUser?.member;
+    bool isCurrentUser =
+        comment.member?.trim().toLowerCase() ==
+            loggedInUser?.member?.trim().toLowerCase();
 
-    // Safely parse and format date
-    /// Converts an ISO 8601 timestamp string to local time and formats it.
-    /// Returns a formatted local time string like '03/06/2025 11:17 PM'.
     String convertUtcIsoToIST(String isoDateString) {
       try {
-        // Step 1: Parse string manually as if it’s UTC
         final dateTime = DateTime.parse(isoDateString);
-
-        // Step 2: Treat parsed time as UTC by reconstructing
         final utcDateTime = DateTime.utc(
           dateTime.year,
           dateTime.month,
@@ -345,11 +343,7 @@ class _CommentPageState extends State<CommentPage> {
           dateTime.minute,
           dateTime.second,
         );
-
-        // Step 3: Add IST offset
         final istDate = utcDateTime.add(const Duration(hours: 5, minutes: 30));
-
-        // Step 4: Format
         return DateFormat('dd/MM/yyyy HH:mm').format(istDate);
       } catch (e) {
         print('Error converting to IST: $e');
@@ -358,7 +352,7 @@ class _CommentPageState extends State<CommentPage> {
     }
 
     return Align(
-      alignment: isCurrentUser ?  Alignment.centerLeft : Alignment.centerRight,
+      alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(10),
@@ -371,15 +365,16 @@ class _CommentPageState extends State<CommentPage> {
           crossAxisAlignment:
           isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Text(
-              comment.member.toString(),
-              style: const TextStyle(fontSize: 12, color: Colors.black54),
-            ),
+            if (!isCurrentUser) // only show name if it's another user
+              Text(
+                comment.member ?? "",
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+            if (!isCurrentUser) const SizedBox(height: 4),
+            Text(comment.remarks ?? ""),
             const SizedBox(height: 4),
-            Text(comment.remarks.toString()),
-            const SizedBox(height: 4),
             Text(
-              convertUtcIsoToIST(comment.date.toString()),
+              convertUtcIsoToIST(comment.date ?? ""),
               style: const TextStyle(fontSize: 10, color: Colors.black38),
             ),
           ],
@@ -387,6 +382,69 @@ class _CommentPageState extends State<CommentPage> {
       ),
     );
   }
+
+  // Widget _buildCommentBubble(CommentModelItem comment) {
+  //   bool isCurrentUser = comment.member == loggedInUser?.member;
+  //
+  //   // Safely parse and format date
+  //   /// Converts an ISO 8601 timestamp string to local time and formats it.
+  //   /// Returns a formatted local time string like '03/06/2025 11:17 PM'.
+  //   String convertUtcIsoToIST(String isoDateString) {
+  //     try {
+  //       // Step 1: Parse string manually as if it’s UTC
+  //       final dateTime = DateTime.parse(isoDateString);
+  //
+  //       // Step 2: Treat parsed time as UTC by reconstructing
+  //       final utcDateTime = DateTime.utc(
+  //         dateTime.year,
+  //         dateTime.month,
+  //         dateTime.day,
+  //         dateTime.hour,
+  //         dateTime.minute,
+  //         dateTime.second,
+  //       );
+  //
+  //       // Step 3: Add IST offset
+  //       final istDate = utcDateTime.add(const Duration(hours: 5, minutes: 30));
+  //
+  //       // Step 4: Format
+  //       return DateFormat('dd/MM/yyyy HH:mm').format(istDate);
+  //     } catch (e) {
+  //       print('Error converting to IST: $e');
+  //       return isoDateString;
+  //     }
+  //   }
+  //
+  //   return Align(
+  //     alignment: isCurrentUser ?  Alignment.centerLeft : Alignment.centerRight,
+  //     child: Container(
+  //       margin: const EdgeInsets.symmetric(vertical: 4),
+  //       padding: const EdgeInsets.all(10),
+  //       decoration: BoxDecoration(
+  //         color: isCurrentUser ? Colors.blue.shade100 : Colors.grey.shade200,
+  //         borderRadius: BorderRadius.circular(10),
+  //       ),
+  //       constraints: const BoxConstraints(maxWidth: 250),
+  //       child: Column(
+  //         crossAxisAlignment:
+  //         isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+  //         children: [
+  //           Text(
+  //             comment.member.toString(),
+  //             style: const TextStyle(fontSize: 12, color: Colors.black54),
+  //           ),
+  //           const SizedBox(height: 4),
+  //           Text(comment.remarks.toString()),
+  //           const SizedBox(height: 4),
+  //           Text(
+  //             convertUtcIsoToIST(comment.date.toString()),
+  //             style: const TextStyle(fontSize: 10, color: Colors.black38),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
 
   @override
@@ -401,6 +459,14 @@ class _CommentPageState extends State<CommentPage> {
         backgroundColor: AppColor.colorPrimary,
         iconTheme: const IconThemeData(color: Colors.white),
         automaticallyImplyLeading: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
+              _fetchComments();
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

@@ -201,10 +201,11 @@ class AuthService {
     return token != null && token.isNotEmpty;
   }
 
-  // Logout function (clears token)
+  // Logout function (clears token and saved email)
   Future<void> logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove('accessToken');
+    await prefs.remove('loggedInUser'); // remove saved email/user data
   }
 
 }

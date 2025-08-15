@@ -709,11 +709,11 @@ class RestFunction{
               "value": subActivityId,
               "and": {
                 "name": "date",
-                "value": "2025-05-23T18:30:00.000Z",
+                "value": "2025-08-08T18:30:00.000Z",
                 "operator": "greaterThan",
                 "and": {
                   "name": "date",
-                  "value": "2025-05-24T18:29:59.999Z",
+                  "value": "2025-08-09T18:29:59.999Z",
                   "operator": "lessThan"
                 }
               }
@@ -727,18 +727,22 @@ class RestFunction{
         'Authorization': 'Bearer $token',
       });
 
-      print('Response body: ${response.body}');
+      if (kDebugMode) {
+        print("Request Body: $token");
+      }
 
       if (response.statusCode == 200) {
+        print('✅ Response body: ${response.body}'); // print only when OK
         return ActivityTrackingResponse.fromJson(jsonDecode(response.body));
       } else {
-        print('Failed to fetch activity: ${response.statusCode} - ${response.body}');
+        print('❌ Failed to fetch activity: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e, stackTrace) {
-      print('Exception: $e\n$stackTrace');
+      print('💥 Exception: $e\n$stackTrace');
       return null;
     }
   }
+
 
 }

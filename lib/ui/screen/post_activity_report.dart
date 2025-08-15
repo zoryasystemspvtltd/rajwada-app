@@ -58,6 +58,16 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
   bool? curingImage = false;
   bool? blueprintImage = false;
 
+  List<DropdownMenuItem<int>> assetsDataItems = [];
+  List<DropdownMenuItem<int>> uomDataItems = [];
+  int? selectedAssetId;
+  int? selectedUomId;
+  int? editingIndex;
+
+  TextEditingController quantityController = TextEditingController();
+
+  List<Map<String, dynamic>> itemList = [];
+
   bool isToday(DateTime date) {
     final now = DateTime.now();
     return date.year == now.year && date.month == now.month && date.day == now.day;
@@ -71,6 +81,30 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
     manpowerController = TextEditingController(text: "0");
     fetchSubActivityDetails();
     fetchActivityTracking();
+    getAssets();
+    getUomData();
+  }
+
+
+  // API calls
+  Future<void> getUomData() async {
+    List<DropdownMenuItem<int>> items =
+    await RestFunction.fetchAndStoreUOMData();
+    if (mounted) {
+      setState(() {
+        uomDataItems = items;
+      });
+    }
+  }
+
+  Future<void> getAssets() async {
+    List<DropdownMenuItem<int>> items =
+    await RestFunction.fetchAndStoreAssetData();
+    if (mounted) {
+      setState(() {
+        assetsDataItems = items;
+      });
+    }
   }
 
   /// MARK:- Show Image in Full Screen
@@ -113,7 +147,9 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
   void fetchActivityTracking() async {
     try {
       final data = await RestFunction.fetchActivityTracking(widget.subDetailItemId);
-      print(data);
+      if (kDebugMode) {
+        print(data);
+      }
       if (data?.items.isNotEmpty ?? false) {
         final latestItem = data!.items.first;
         print(latestItem);
@@ -123,7 +159,7 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
           isLoading = false;
 
           // Populate manpower if available
-          manpowerController.text = latestItem!.manPower.toString();
+          manpowerController.text = latestItem.manPower.toString();
 
           if (latestItem.isOnHold) {
             taskStateData = 'On Hold';
@@ -633,6 +669,216 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
               ],
             ),
             const SizedBox(height: 10),
+            // ---------------- Item List Section ----------------
+            const SizedBox(height: 20),
+            const Text("Item List", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+
+            DropdownButtonFormField<int>(
+              decoration: const InputDecoration(labelText: "Item"),
+              value: selectedAssetId,
+              items: assetsDataItems,
+              onChanged: (value) {
+                setState(() {
+                  selectedAssetId = value;
+                });
+              },
+            ),
+
+            TextFormField(
+              controller: quantityController,
+              decoration: const InputDecoration(labelText: "Quantity"),
+              keyboardType: TextInputType.number,
+            ),
+
+            DropdownButtonFormField<int>(
+              decoration: const InputDecoration(labelText: "UOM"),
+              value: selectedUomId,
+              items: uomDataItems,
+              onChanged: (value) {
+                setState(() {
+                  selectedUomId = value;
+                });
+              },
+            ),
+
+            const SizedBox(height: 10),
+
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white, // White text
+              ),
+              onPressed: () {
+                if (selectedAssetId != null &&
+                    selectedUomId != null &&
+                    quantityController.text.isNotEmpty) {
+                  setState(() {
+                    if (editingIndex != null) {
+                      // Update existing item
+                      itemList[editingIndex!] = {
+                        "itemId": selectedAssetId,
+                        "itemName": assetsDataItems
+                            .firstWhere((e) => e.value == selectedAssetId)
+                            .child
+                            .toString()
+                            .replaceAll("Text(", "")
+                            .replaceAll(")", "")
+                            .replaceAll('"', ''),
+                        "quantity": quantityController.text,
+                        "uomId": selectedUomId,
+                        "uomName": uomDataItems
+                            .firstWhere((e) => e.value == selectedUomId)
+                            .child
+                            .toString()
+                            .replaceAll("Text(", "")
+                            .replaceAll(")", "")
+                            .replaceAll('"', ''),
+                      };
+                      editingIndex = null;
+                    } else {
+                      // Add new item
+                      itemList.add({
+                        "itemId": selectedAssetId,
+                        "itemName": assetsDataItems
+                            .firstWhere((e) => e.value == selectedAssetId)
+                            .child
+                            .toString()
+                            .replaceAll("Text(", "")
+                            .replaceAll(")", "")
+                            .replaceAll('"', ''),
+                        "quantity": quantityController.text,
+                        "uomId": selectedUomId,
+                        "uomName": uomDataItems
+                            .firstWhere((e) => e.value == selectedUomId)
+                            .child
+                            .toString()
+                            .replaceAll("Text(", "")
+                            .replaceAll(")", "")
+                            .replaceAll('"', ''),
+                      });
+                    }
+                    quantityController.clear();
+                    selectedAssetId = null;
+                    selectedUomId = null;
+                  });
+                }
+              },
+              child: Text(editingIndex != null ? "Update Item" : "Add Item"),
+            ),
+
+            const SizedBox(height: 10),
+
+            Table(
+              border: TableBorder.all(color: Colors.grey),
+              columnWidths: const {
+                0: FlexColumnWidth(3),
+                1: FlexColumnWidth(2),
+                2: FlexColumnWidth(2),
+                3: FlexColumnWidth(3),
+              },
+              children: [
+                TableRow(
+                  decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.3)),
+                  children: const [
+                    Padding(padding: EdgeInsets.all(8), child: Text("Item")),
+                    Padding(padding: EdgeInsets.all(8), child: Text("Quantity")),
+                    Padding(padding: EdgeInsets.all(8), child: Text("UOM")),
+                    Padding(padding: EdgeInsets.all(8), child: Text("Actions")),
+                  ],
+                ),
+                ...itemList.map((item) {
+                  return TableRow(
+                    children: [
+                      Padding(padding: const EdgeInsets.all(8), child: Text(item["itemName"])),
+                      Padding(padding: const EdgeInsets.all(8), child: Text(item["quantity"])),
+                      Padding(padding: const EdgeInsets.all(8), child: Text(item["uomName"])),
+                      Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Row(
+                          children: [
+                            // Edit Icon Button
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedAssetId = item["itemId"];
+                                  selectedUomId = item["uomId"];
+                                  quantityController.text = item["quantity"];
+                                  editingIndex = itemList.indexOf(item);
+                                });
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.orange,
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                padding: const EdgeInsets.all(6),
+                                child: const Icon(
+                                  Icons.edit,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            // Delete Icon Button
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  itemList.remove(item);
+                                });
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                padding: const EdgeInsets.all(6),
+                                child: const Icon(
+                                  Icons.delete,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white, // White text
+              ),
+              onPressed: () {
+                List<Map<String, String>> finalData = itemList.map((e) {
+                  return {
+                    "itemId": e["itemId"].toString(),
+                    "quantity": e["quantity"].toString(),
+                    "uomId": e["uomId"].toString(),
+                  };
+                }).toList();
+                print(jsonEncode(finalData)); // Final array
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      "Item list updated Successfully",
+                      style: TextStyle(fontSize: 16, color: Colors.green),
+                    ),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              child: const Text("Save Item List"),
+            ),
+// ----------------------------------------------------
+            const SizedBox(height: 20),
             const Text("Activity Blueprint", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             Center(
@@ -713,6 +959,14 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
                                       activityDetails?.member.toString();
                                   String? taskKey =
                                       activityDetails?.key.toString();
+                                  // Prepare final item list from your table data
+                                  List<Map<String, String>> finalItemList = itemList.map((e) {
+                                    return {
+                                      "itemId": e["itemId"].toString(),
+                                      "quantity": e["quantity"].toString(),
+                                      "uomId": e["uomId"].toString(),
+                                    };
+                                  }).toList();
 
                                   if (kDebugMode) {
                                     print(costData);
@@ -735,7 +989,7 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
                                   //   taskMember: taskMember.toString(),
                                   //   taskKey: taskKey.toString(),
                                   // );
-                                  await sendPatchData(taskId, taskName, taskStatus, taskMember, taskKey);
+                                  await sendPatchData(taskId, taskName, taskStatus, taskMember, taskKey, finalItemList); // 👈 pass here
                                 }
                               : null, // 👈 Disabled if not today
                           style: ElevatedButton.styleFrom(
@@ -757,31 +1011,33 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
     );
   }
 
-  Future<void> sendFullDataToAPI(taskId, taskName, taskStatus, taskMember, taskKey) async {
+  Future<void> sendFullDataToAPI(
+      taskId,
+      taskName,
+      taskStatus,
+      taskMember,
+      taskKey,
+      List<Map<String, String>> itemListData,
+      ) async {
     setState(() {
-      isLoading = true; // Show loader before API call
+      isLoading = true;
     });
+
     String? token = await SharedPreference.getToken();
-    if (token == null) return; // Return null if token is missing
+    if (token == null) return;
 
-    String apiUrl = "https://65.0.190.66/api/activityTracking";
+    String apiUrl = "https://65.0.190.66/api/activitytracking";
 
-    // Request body
+    // Build request body exactly like required payload
     Map<String, dynamic> requestBody = {
+      "activityId": activityId,
       "manPower": manpowerData,
+      "item": jsonEncode(itemListData), // must be JSON string
+      "cost": costData,
       "isOnHold": onHoldStatus,
       "isCancelled": onCancelledStatus,
       "isCuringDone": onCuringStatus,
-      "cost": costData,
-      // "Item": "string",
-      "activityId": activityId,
       "name": taskName,
-      // "id": taskId,
-      // "name": taskName,
-      // "status": taskStatus,
-      // "date": DateTime.now().toIso8601String(),
-      // "member": taskMember,
-      // "key": taskKey
     };
 
     if (kDebugMode) {
@@ -799,39 +1055,45 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
         body: jsonEncode(requestBody),
       );
 
+      setState(() {
+        isLoading = false;
+      });
+
       if (response.statusCode == 200) {
-        setState(() {
-          isLoading = false; // Only state change goes here
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  "Activity Updated Successfully",
-                  style: TextStyle(fontSize: 16, color: Colors.green, fontWeight: FontWeight.normal),
-                ),
-                duration: Duration(seconds: 2),
-              )
-          );
-        });
-        await uploadImageData(
-          context: context,
-          taskId: taskId,
-          taskName: taskName,
-          taskStatus: taskStatus,
-          taskMember: taskMember,
-          taskKey: taskKey,
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Activity Added Successfully",
+              style: TextStyle(fontSize: 16, color: Colors.green),
+            ),
+            duration: Duration(seconds: 2),
+          ),
         );
 
+        // Decide based on image availability
+        if (_capturedCuringImage == null && _capturedBlueprintImage == null) {
+          // No image → pop directly
+          Navigator.pop(context);
+        } else {
+          // Image available → follow normal upload flow
+          await uploadImageData(
+            context: context,
+            taskId: taskId,
+            taskName: taskName,
+            taskStatus: taskStatus,
+            taskMember: taskMember,
+            taskKey: taskKey,
+          );
+        }
       } else {
-        setState(() {
-          isLoading = false; // Hide loader after API response
-        });
         if (kDebugMode) {
           print("Failed to send data: ${response.statusCode}");
+          print("Response body: ${response.body}");
         }
       }
     } catch (e) {
       setState(() {
-        isLoading = false; // Hide loader after API response
+        isLoading = false;
       });
       if (kDebugMode) {
         print("Error: $e");
@@ -839,7 +1101,7 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
     }
   }
 
-  Future<void> sendPatchData(taskId, taskName, taskStatus, taskMember, taskKey) async {
+  Future<void> sendPatchData(taskId, taskName, taskStatus, taskMember, taskKey, List<Map<String, String>> itemListData) async {
     setState(() {
       isLoading = true; // Show loader before API call
     });
@@ -911,8 +1173,8 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
 
     if (kDebugMode) {
       print("Api url: $apiUrl");
-      print("Request Body: $requestBody");
-      print("Token: $token");
+      print("Request Body for patch: $requestBody");
+      print("Token for path: $token");
       print("Encoded JSON: ${jsonEncode(requestBody)}");
       print("costData: $costData (${costData.runtimeType})");
       print("progressData: $progressData (${progressData.runtimeType})");
@@ -944,7 +1206,7 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
               )
           );
         });
-        await sendFullDataToAPI(taskId, taskName, taskStatus, taskMember, taskKey); // Async call happens *after* setState
+        await sendFullDataToAPI(taskId, taskName, taskStatus, taskMember, taskKey, itemListData); // Async call happens *after* setState
         // if (kDebugMode) {
         //   print("API Response Value: $response");
         // }
