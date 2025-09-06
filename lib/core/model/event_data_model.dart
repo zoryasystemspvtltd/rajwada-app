@@ -32,7 +32,7 @@ class EventModel {
 
 class Activity {
   final int id;
-  final Name name;
+  final String name;
 
   Activity({
     required this.id,
@@ -41,12 +41,12 @@ class Activity {
 
   factory Activity.fromJson(Map<String, dynamic> json) => Activity(
     id: json["id"],
-    name: nameValues.map[json["name"]]!,
+    name: json["name"] ?? "",
   );
 
   Map<String, dynamic> toJson() => {
     "id": id,
-    "name": nameValues.reverse[name],
+    "name": name,
   };
 }
 
