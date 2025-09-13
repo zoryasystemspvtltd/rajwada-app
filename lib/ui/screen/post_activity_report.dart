@@ -13,7 +13,7 @@ import '../../core/model/activity_tracking_response.dart';
 import '../../core/service/shared_preference.dart';
 import '../helper/app_colors.dart';
 import 'add_challan.dart';
-
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 
 class PostActivityReportPage extends StatefulWidget {
@@ -887,52 +887,82 @@ class _PostActivityReportPageState extends State<PostActivityReportPage> {
                   // Handle tap
                   _showIconOptionsDialog(details.localPosition); // ✅ Pass setStateDialog
                 },
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                  ),
-                  child: Stack(
-                    children: [
-                      if (bytes != null)
-                        Image.memory(bytes!)
-                      else
-                        const Text("No blueprint available"),
-                      ..._icons.map((iconData) {
-                        Offset position = iconData['position'];
-                        String type = iconData['type'];
-                        String text = iconData['text'];
+                  child: SizedBox(
+                    height: 265,
+                    width: double.infinity,
+                    child: Stack(
+                      children: [
+                        // 📄 PDF or 🖼️ Image viewer
+                        if (bytes != null)
+                          Builder(
+                            builder: (context) {
+                              if (activityDetails?.photoUrl?.startsWith("data:application/pdf") ?? false) {
+                                return SfPdfViewer.memory(
+                                  bytes!,
+                                  canShowScrollHead: false,
+                                  canShowScrollStatus: false,
+                                );
+                              } else {
+                                return Image.memory(
+                                  bytes!,
+                                  fit: BoxFit.contain,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                );
+                              }
+                            },
+                          )
+                        else
+                          const Center(child: Text("No blueprint available")),
 
-                        return Positioned(
-                          left: position.dx - 25,
-                          top: position.dy - 25,
+                        // 👆 Transparent tap layer (catches taps instantly)
+                        Positioned.fill(
                           child: GestureDetector(
-                            onTap: () => _handleIconTap(iconData, activityDetails!),
-                            child: Column(
-                              children: [
-                                Image.asset(
-                                  type == 'camera'
-                                      ? 'assets/images/c1.png'
-                                      : 'assets/images/pin.png',
-                                  width: 25,
-                                  height: 25,
-                                ),
-                                if (text.isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.all(5),
-                                    color: Colors.white,
-                                    child: Text(
-                                      text,
-                                      style: const TextStyle(fontSize: 12, color: Colors.black),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                            behavior: HitTestBehavior.translucent,
+                            onTapDown: (details) {
+                              _showIconOptionsDialog(details.localPosition); // 👈 your popup
+                            },
+                            child: Container(color: Colors.transparent),
                           ),
-                        );
-                      }),
-                    ],
+                        ),
+
+                        // 📍 Overlay icons
+                        ..._icons.map((iconData) {
+                          Offset position = iconData['position'];
+                          String type = iconData['type'];
+                          String text = iconData['text'];
+
+                          return Positioned(
+                            left: position.dx - 25,
+                            top: position.dy - 25,
+                            child: GestureDetector(
+                              onTap: () => _handleIconTap(iconData, activityDetails!),
+                              child: Column(
+                                children: [
+                                  Image.asset(
+                                    type == 'camera'
+                                        ? 'assets/images/c1.png'
+                                        : 'assets/images/pin.png',
+                                    width: 25,
+                                    height: 25,
+                                  ),
+                                  if (text.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.all(5),
+                                      color: Colors.white,
+                                      child: Text(
+                                        text,
+                                        style: const TextStyle(fontSize: 12, color: Colors.black),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
                   ),
-                ),
               ),
             ),
             const SizedBox(height: 20),
